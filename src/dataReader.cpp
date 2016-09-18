@@ -6,9 +6,7 @@
 
 using namespace std;
 
-DEFINE_bool(debug, false, "Sets the Network debug variable to enable(disable) extra logging");
-DEFINE_string(logging_dir, "/users/aman/code/multi_node_nn/logging/log.txt", "Sets the location for the logging directory");
-DEFINE_string(data_dir, "/users/aman/code/multi_node_nn/logging/data.tsv", "Sets the location for the data output (python input) directory");
+DEFINE_bool(debug, false, "Sets the debug variable to enable(disable) extra logging");
 
 dataReader::dataReader(std::string dataset, long in, long out) {
 

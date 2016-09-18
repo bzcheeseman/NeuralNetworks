@@ -14,8 +14,6 @@
 #include <omp.h>
 
 DECLARE_bool(debug);
-DECLARE_string(logging_dir);
-DECLARE_string(data_dir);
 
 template<typename T>
 struct dataSet{
