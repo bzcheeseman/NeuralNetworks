@@ -6,10 +6,9 @@ set(CMAKE_CXX_COMPILER /usr/local/bin/g++-6)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -fopenmp")
 
+find_package(eigen3 REQUIRED)
 include_directories("/usr/local/include/eigen3")
 
 set(SOURCE_FILES main.cpp src/Network.cpp include/Network.hpp src/dataReader.cpp include/dataReader.hpp)
 add_executable(NeuralNetworks ${SOURCE_FILES})
-#target_link_libraries(NeuralNetworks ceres)
-#target_link_libraries(NeuralNetworks glog)
 target_link_libraries(NeuralNetworks gflags)

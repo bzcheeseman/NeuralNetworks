@@ -14,11 +14,12 @@ should be self explanatory.  Change parameters and sizing as desired.
 
 TO DO:
 * COMMENT - it works NOW COMMENT IT
-* Implement regularization
 * Read from/Write to file
 * Other, fancier networks!
 
-
+This code for now implements a basic feed forward fully connected neural network.
+This network uses L2-regularization to try and prevent overfitting, and is parallelized
+using OpenMP to speed up training.
 
 Dependencies:
 ```

@@ -63,7 +63,7 @@ void FFNetwork::backPropagate(VectorXd input, VectorXd correct, double (*phi)(do
     delta = (w[l+1].transpose() * delta).cwiseProduct(zs[l].unaryExpr(phiprime)); //recalculate delta
 
     w[l] -= eta * (delta * as[l-1].transpose());  //update w
-//    w[l] -= (eta/lamda) * w[l]; //regularization
+    w[l] -= (eta/lamda) * w[l]; //regularization
     b[l] -= eta * delta; //update b
   }
 

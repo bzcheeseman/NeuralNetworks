@@ -12,7 +12,6 @@
 #include "dataReader.hpp"
 
 /*
- * TODO: Implement regularization or something
  * TODO: read from/write to file
  * TODO: Other fancier networks!
  */

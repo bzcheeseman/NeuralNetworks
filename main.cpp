@@ -58,8 +58,8 @@ int main(int argc, char *argv[]){
   double duration;
 
   std::vector<unsigned> topo = {4, 3, 3};
-  double eta = 0.1;
-  double l = 10.;
+  double eta = 1e-1;
+  double l = 1e6; //this appears in a denominator - regularization parameter
 
   dataReader *train = new dataReader("/Users/Aman/code/NeuralNetworks/data/iris_training.dat", 4, 3);
   dataReader *validate = new dataReader("/Users/Aman/code/NeuralNetworks/data/iris_validation.dat", 4, 3);
