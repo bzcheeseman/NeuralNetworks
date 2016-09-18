@@ -58,12 +58,12 @@ public:
 
   Eigen::VectorXd feedForward(Eigen::VectorXd input, double (*actfunc)(double));
 
-  void backPropagate(Eigen::VectorXd input, Eigen::VectorXd correct, double (*phi)(double),
+  double backPropagate(Eigen::VectorXd input, Eigen::VectorXd correct, double (*phi)(double),
                      double (*phiprime)(double), Eigen::VectorXd (*cost)(Eigen::VectorXd, Eigen::VectorXd),
                      Eigen::VectorXd (*costprime)(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd));
 
-  void Train(dataSet<double> *training, dataSet<double> *validation, double goal, long max_epochs, double (*phi)(double),
-             double (*phiprime)(double), Eigen::VectorXd (*cost)(Eigen::VectorXd, Eigen::VectorXd),
+  void Train(dataSet<double> *training, dataSet<double> *validation, double goal, long max_epochs, double min_gradient,
+             double (*phi)(double), double (*phiprime)(double), Eigen::VectorXd (*cost)(Eigen::VectorXd, Eigen::VectorXd),
              Eigen::VectorXd (*costprime)(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd));
 
   double Evaluate(int rand_seed, dataSet<double> *validation,

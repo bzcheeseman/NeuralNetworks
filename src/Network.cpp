@@ -20,10 +20,8 @@ FFNetwork::FFNetwork(std::vector<unsigned> topology, double eta, double lamda)
   b[0] = VectorXd::Zero(1);
 
   for (int l = 1; l < topology.size(); l++){
-//    double rand;
-//    random_double(0.0, (1./sqrt((double)topology[l-1])), &rand);
-    w[l] = MatrixXd::Random(topology[l], topology[l-1]);
-    b[l] = VectorXd::Random(topology[l]);
+    w[l] = MatrixXd::Random(topology[l], topology[l-1]) / sqrt((double)topology[l-1]);
+    b[l] = VectorXd::Random(topology[l]) / sqrt((double)topology[l]);
     zs[l] = VectorXd::Zero(topology[l]);
     as[l] = VectorXd::Zero(topology[l]);
   }
@@ -47,7 +45,7 @@ Eigen::VectorXd FFNetwork::feedForward(Eigen::VectorXd input, double (*actfunc)(
   return as[end-1];
 }
 
-void FFNetwork::backPropagate(VectorXd input, VectorXd correct, double (*phi)(double),
+double FFNetwork::backPropagate(VectorXd input, VectorXd correct, double (*phi)(double),
                             double (*phiprime)(double), VectorXd (*cost)(VectorXd, VectorXd),
                             VectorXd (*costprime)(VectorXd, VectorXd, VectorXd)) {
 
@@ -55,6 +53,9 @@ void FFNetwork::backPropagate(VectorXd input, VectorXd correct, double (*phi)(do
   long layers = topology.size();
 
   VectorXd delta = costprime(net_result, correct, zs[layers-1]);
+
+  double out = abs(delta.norm());
+
   b[layers-1] -= eta * delta;
   w[layers-1] -= eta * (delta * as[layers-2].transpose());
 
@@ -65,12 +66,15 @@ void FFNetwork::backPropagate(VectorXd input, VectorXd correct, double (*phi)(do
     w[l] -= eta * (delta * as[l-1].transpose());  //update w
     w[l] -= (eta/lamda) * w[l]; //regularization
     b[l] -= eta * delta; //update b
+
   }
+
+  return out;
 
 }
 
-void FFNetwork::Train(dataSet<double> *training, dataSet<double> *validation, double goal, long max_epochs, double (*phi)(double),
-                    double (*phiprime)(double), VectorXd (*cost)(Eigen::VectorXd, Eigen::VectorXd),
+void FFNetwork::Train(dataSet<double> *training, dataSet<double> *validation, double goal, long max_epochs, double min_gradient,
+                      double (*phi)(double), double (*phiprime)(double), VectorXd (*cost)(Eigen::VectorXd, Eigen::VectorXd),
                     VectorXd (*costprime)(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd)) {
 
   long epochs = 0;
@@ -81,7 +85,8 @@ void FFNetwork::Train(dataSet<double> *training, dataSet<double> *validation, do
 
   std::cout << "Initial cost on validation set: " << Evaluate(dist(generator), validation, phi, cost) << std::endl;
 
-  bool abort = false;
+  bool abort_goal_reached = false;
+  bool abort_gradient_reached = false;
 
   static int choose;
   static double performance;
@@ -91,8 +96,8 @@ void FFNetwork::Train(dataSet<double> *training, dataSet<double> *validation, do
 
     static std::mt19937 gen;
 
-#pragma omp flush(abort)
-    if (!abort) {
+#pragma omp flush(abort_goal_reached, abort_gradient_reached)
+    if (!abort_goal_reached && !abort_gradient_reached) {
 #pragma omp atomic update
       epochs++;
 
@@ -102,17 +107,26 @@ void FFNetwork::Train(dataSet<double> *training, dataSet<double> *validation, do
       performance = Evaluate(choose, validation, phi, cost);
 
       if (performance < goal) {
-        abort = true;
-#pragma omp flush(abort)
+        abort_goal_reached = true;
+#pragma omp flush(abort_goal_reached)
       }
 
-      this->backPropagate(training->inputs[choose], training->outputs[choose], phi, phiprime, cost, costprime);
+      double gradient = this->backPropagate(training->inputs[choose], training->outputs[choose], phi, phiprime, cost, costprime);
+      if (gradient < min_gradient){
+        abort_gradient_reached = true;
+#pragma omp flush(abort_gradient_reached)
+      }
     }
 
   }
 
+  if (abort_goal_reached){
+    std::cout << "Finished training in " << epochs << " epochs, cost goal reached" << std::endl;
+  }
+  else if (abort_gradient_reached){
+    std::cout << "Finished training in " << epochs << " epochs, gradient < MIN_GRADIENT = " << min_gradient << std::endl;
+  }
 
-  std::cout << "Finished training in " << epochs << " epochs" << std::endl;
   std::cout << "Final cost on validation set: " << Evaluate(dist(generator), validation, phi, cost) << std::endl << std::endl;
 
 }
