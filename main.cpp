@@ -3,44 +3,13 @@
 //
 
 #include <iostream>
+#include <string>
 #include <math.h>
 #include <ctime>
-#include "include/Network.hpp"
+#include "include/FFNetwork.hpp"
 #include "include/dataReader.hpp"
-
-double Sigmoid(double input){
-  return 1./(1. + exp(-input));
-}
-
-double Tanh(double input){
-  return tanh(input);
-}
-
-double TanhPrime(double input){
-  return 1-pow(std::tanh(input), 2);
-}
-
-double SigmoidPrime(double input){
-  return Sigmoid(input) * (1.-Sigmoid(input));
-}
-
-Eigen::VectorXd QuadCost(Eigen::VectorXd out, Eigen::VectorXd correct){
-  return 0.5 * (out - correct).array().pow(2);
-}
-
-Eigen::VectorXd QuadCostPrime(Eigen::VectorXd out, Eigen::VectorXd correct, Eigen::VectorXd last_zs){
-  return (out - correct).cwiseProduct(last_zs.unaryExpr(&SigmoidPrime));
-}
-
-Eigen::VectorXd CrossEntropyCost(Eigen::VectorXd out, Eigen::VectorXd correct){
-  Eigen::VectorXd output =  -correct.array() * out.array().log() +
-          (Eigen::VectorXd::Ones(correct.size()) - correct).array() * (Eigen::VectorXd::Ones(out.size()) - out).array().log();
-  return output;
-}
-
-Eigen::VectorXd CrossEntropyPrime(Eigen::VectorXd out, Eigen::VectorXd correct, Eigen::VectorXd last_zs){
-  return out-correct;
-}
+#include "include/Activations.hpp"
+#include "include/CostFunctions.hpp"
 
 double truncate(double in){
   if (in >= 0.5){
@@ -60,15 +29,20 @@ int main(int argc, char *argv[]){
   std::vector<unsigned> topo = {4, 3, 3};
   double eta = 5e-2;
   double l = 1e6; //this appears in a denominator - regularization parameter
+  double gamma = 0.95;
+  double epsilon = 1e-6;
+  std::string backprop = "ADADELTA";
 
   dataReader *train = new dataReader("/Users/Aman/code/NeuralNetworks/data/iris_training.dat", 4, 3);
   dataReader *validate = new dataReader("/Users/Aman/code/NeuralNetworks/data/iris_validation.dat", 4, 3);
   dataReader *test = new dataReader("/Users/Aman/code/NeuralNetworks/data/iris_test.dat", 4, 3);
 
-  FFNetwork *net = new FFNetwork(topo, eta, l);
+  FFNetwork *net = new FFNetwork(topo, eta, l, gamma, epsilon);
+  net->setFunctions(Tanh, TanhPrime, Identity, QuadCost, QuadCostPrime);
+  net->setBackpropAlgorithm(backprop.c_str());
   int corr = 0;
   for (int i = 0; i < test->data->count; i++){
-    Eigen::VectorXd out = net->feedForward(test->data->inputs[i], Sigmoid);
+    Eigen::VectorXd out = net->feedForward(test->data->inputs[i]);
     out = out.unaryExpr(&truncate);
     if (out == test->data->outputs[i]){
       corr++;
@@ -79,20 +53,20 @@ int main(int argc, char *argv[]){
 
   int len = train->data->count;
 
-  double goal = 1e-3;
+  double goal = 5e-3;
   long max_epochs = 1e9;
-  double min_gradient = 5e-4;
+  double min_gradient = 5e-3;
 
   start = std::clock();
-  net->Train(train->data, validate->data, goal, max_epochs, min_gradient, Sigmoid, SigmoidPrime, QuadCost, QuadCostPrime);
-  duration = ( std::clock() - start ) / ((double) CLOCKS_PER_SEC * omp_get_max_threads());
+  net->Train(train->data, validate->data, goal, max_epochs, min_gradient);
+  duration = ( std::clock() - start ) / ((double) CLOCKS_PER_SEC);
 
   std::cout << "Training took " << duration << " sec" << std::endl << std::endl;
 
 
   corr = 0;
   for (int i = 0; i < test->data->count; i++){
-    Eigen::VectorXd out = net->feedForward(test->data->inputs[i], Sigmoid);
+    Eigen::VectorXd out = net->feedForward(test->data->inputs[i]);
     out = out.unaryExpr(&truncate);
     if (out == test->data->outputs[i]){
       corr++;
@@ -102,9 +76,9 @@ int main(int argc, char *argv[]){
   std::cout << "After Training: " << corr << "/" << test->data->count << " correct" << std::endl << std::endl;
 
   std::cout << "Raw network output on test dataset:" << std::endl;
-  std::cout << net->feedForward(test->data->inputs[0], Sigmoid) << std::endl << std::endl;
+  std::cout << net->feedForward(test->data->inputs[0]) << std::endl << std::endl;
   std::cout << "Truncated network output (>=0.5 = 1, <0.5 = 0):" << std::endl;
-  std::cout << net->feedForward(test->data->inputs[0], Sigmoid).unaryExpr(&truncate) << std::endl << std::endl;
+  std::cout << net->feedForward(test->data->inputs[0]).unaryExpr(&truncate) << std::endl << std::endl;
   std::cout << "Corresponding correct output:" << std::endl;
   std::cout << test->data->outputs[0] << std::endl;
 
