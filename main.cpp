@@ -10,16 +10,6 @@
 #include "include/dataReader.hpp"
 #include "include/Activations.hpp"
 #include "include/CostFunctions.hpp"
-#include "include/DropoutandRegularization.hpp"
-
-double truncate(double in){
-  if (in >= 0.5){
-    return 1.;
-  }
-  else{
-    return 0.;
-  }
-}
 
 int main(int argc, char *argv[]){
   gflags::ParseCommandLineFlags(&argc, &argv, true);
@@ -62,9 +52,8 @@ int main(int argc, char *argv[]){
 
   corr = 0;
   for (int i = 0; i < test->data->count; i++){
-    Eigen::VectorXd out = net->feedForward(test->data->inputs[i]);
-    out = out.unaryExpr(&truncate);
-    if (out == test->data->outputs[i]){
+    Eigen::VectorXi out = (*net)(test->data->inputs[i]);
+    if (out == test->data->outputs[i].cast<int>()){
       corr++;
     }
   }

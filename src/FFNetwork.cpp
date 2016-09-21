@@ -2,7 +2,6 @@
 // Created by Aman LaChapelle on 9/18/16.
 //
 
-#include <ctime>
 #include "../include/FFNetwork.hpp"
 
 using namespace Eigen;
@@ -17,8 +16,12 @@ FFNetwork::FFNetwork(std::vector<unsigned> topology, std::vector<unsigned> dropo
   layers[0].b = VectorXd::Zero(1);
 
   for (int l = 1; l < topology.size(); l++){
-    layers[l].w = MatrixXd::Random(topology[l], topology[l-1]) / sqrt((double)topology[l-1]);
-    layers[l].b = VectorXd::Random(topology[l]) / sqrt((double)topology[l]);
+    layers[l].w = MatrixXd::Random(topology[l], topology[l-1]);
+    layers[l].w /= sqrt((double)topology[l-1]);
+
+    layers[l].b = VectorXd::Random(topology[l]);
+    layers[l].b /= sqrt((double)topology[l]);
+
     layers[l].z = VectorXd::Zero(topology[l]);
     layers[l].a = VectorXd::Zero(topology[l]);
   }
@@ -70,6 +73,13 @@ Eigen::VectorXd FFNetwork::feedForward(Eigen::VectorXd input) {
   }
 
   return layers[end-1].a;
+}
+
+Eigen::VectorXi FFNetwork::operator()(Eigen::VectorXd input) {
+  VectorXd net_out = this->feedForward(input);
+  net_out = net_out.unaryExpr(&truncate);
+
+  return net_out.cast<int>();
 }
 
 double FFNetwork::SGD(VectorXd input, VectorXd correct) {
@@ -240,6 +250,7 @@ void FFNetwork::Train(dataSet<double> *training, dataSet<double> *validation, do
   static int choose;
   static double performance;
 
+  std::cout << "Beginning Training...\n==========" << std::endl;
 
   for (long i = 0; i <= max_epochs; i++){
 
@@ -280,8 +291,20 @@ void FFNetwork::Train(dataSet<double> *training, dataSet<double> *validation, do
     std::cout << "Finished training in " << epochs << " epochs, gradient < MIN_GRADIENT = " << min_gradient << std::endl;
   }
 
+  std::string algorithm;
+  if (this->backprop == StochGradDescent){
+    algorithm = "SGD";
+  }
+  else if (this->backprop == MOMSGD){
+    algorithm = "MOMSGD";
+  }
+  else if (this->backprop == ADADELTA){
+    algorithm = "ADADELTA";
+  }
+
   std::cout << "Average time per epoch: " << (duration/((double)epochs)) * 1e3 << " ms" << std::endl;
   std::cout << "Training took " << duration << " sec overall" << std::endl;
+  std::cout << "Training Algorithm: " << algorithm << std::endl;
   std::cout << "Final cost on validation set: " << Evaluate(dist(generator), validation) << std::endl << std::endl;
 
 }
@@ -307,4 +330,21 @@ std::ostream &operator<<(std::ostream &out, FFNetwork &net) {
   out << std::endl;
   return out;
 }
+
+std::ofstream &operator<<(std::ofstream &out, const FFNetwork &net) {
+  //come up with a good way to write this to a file smartly
+
+  for (int i = 0; i < net.topology.size(); i++){
+
+    out << net.layers[i].w << std::endl << std::endl;
+    out << net.layers[i].b << std::endl;
+
+  }
+  out << std::endl;
+  return out;
+}
+
+//std::ifstream& operator>>(std::ifstream &in, const char *filename) {
+//  return <#initializer#>;
+//}
 

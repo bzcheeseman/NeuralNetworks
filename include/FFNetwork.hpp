@@ -7,9 +7,11 @@
 
 #include <Eigen/Dense>
 #include <vector>
+#include <ctime>
 #include <random>
 #include <omp.h>
 #include "dataReader.hpp"
+#include "DropoutandRegularization.hpp"
 
 /*
  * TODO: read from/write to file
@@ -110,6 +112,14 @@ public:
   void setBackpropAlgorithm(const char *algorithm);
 
   /**
+   * Makes a prediction on the network.  Uses the trained network and forward propagates one input to return one output.
+   *
+   * @param input
+   * @return Truncated network output
+   */
+  Eigen::VectorXi operator()(Eigen::VectorXd input);
+
+  /**
    * Makes a prediction based on the current network model.  Feeds an input through the network and returns the output.
    *
    * @param input Input vector to the network
@@ -160,12 +170,35 @@ public:
   double Evaluate(int rand_seed, dataSet<double> *validation);
 
   /**
+   * Prints the network weights and biases to the stdout - careful if you use this with a large network!
    *
    * @param out
    * @param net
    * @return
    */
   friend std::ostream& operator<<(std::ostream& out, FFNetwork &net);
+
+  /**
+   * Writes the network details to a file.
+   *
+   * NW
+   *
+   * @param out Outgoing file stream
+   * @param net The network to write to a file
+   * @return Outgoing file stream
+   */
+  friend std::ofstream& operator<<(std::ofstream& out, const FFNetwork &net);
+
+  /**
+   * Reads from the file outputted by operator<<(std::ofstream&,FFNetwork&).  Not guaranteed to work on anything else.
+   *
+   * NW
+   *
+   * @param in Incoming file stream
+   * @param filename The name of the file that holds the network details
+   * @return A network initialized from the weights in the file!
+   */
+//  friend std::ifstream& operator>>(std::ifstream& in, const char *filename);
 };
 
 

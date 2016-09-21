@@ -10,11 +10,11 @@
 #define DROPOUT 0.8
 
 //Regularization
-double Identity(double input){
+inline double Identity(double input){
   return input;
 }
 
-double Sign(double input){
+inline double Sign(double input){
   if (input > 0){
     return 1.;
   }
@@ -26,17 +26,27 @@ double Sign(double input){
   }
 }
 
-double Zero(double input){
+inline double Zero(double input){
   return 0.;
 }
 
 //Dropout
-double Bernoulli(double input){
+inline double Bernoulli(double input){
   std::random_device rand;
   std::mt19937 generator(rand());
   std::binomial_distribution<> dist(1, DROPOUT);
 
   return (double)dist(generator);
+}
+
+//Truncation
+inline double truncate(double in){
+  if (in >= 0.5){
+    return 1.;
+  }
+  else{
+    return 0.;
+  }
 }
 
 #endif //NEURALNETWORKS_DROPOUTANDREGULARIZATION_HPP
