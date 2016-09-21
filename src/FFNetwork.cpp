@@ -2,6 +2,7 @@
 // Created by Aman LaChapelle on 9/18/16.
 //
 
+#include <ctime>
 #include "../include/FFNetwork.hpp"
 
 using namespace Eigen;
@@ -221,6 +222,10 @@ double FFNetwork::Adadelta(Eigen::VectorXd input, Eigen::VectorXd correct) {
 void FFNetwork::Train(dataSet<double> *training, dataSet<double> *validation, double goal,
                       long max_epochs, double min_gradient) {
 
+  std::clock_t start;
+  double duration;
+  start = std::clock();
+
   long epochs = 0;
 
   std::random_device rand;
@@ -266,6 +271,8 @@ void FFNetwork::Train(dataSet<double> *training, dataSet<double> *validation, do
     }
   }
 
+  duration = ( std::clock() - start ) / ((double) CLOCKS_PER_SEC);
+
   if (abort_goal_reached){
     std::cout << "Finished training in " << epochs << " epochs, cost goal reached" << std::endl;
   }
@@ -273,6 +280,8 @@ void FFNetwork::Train(dataSet<double> *training, dataSet<double> *validation, do
     std::cout << "Finished training in " << epochs << " epochs, gradient < MIN_GRADIENT = " << min_gradient << std::endl;
   }
 
+  std::cout << "Average time per epoch: " << (duration/((double)epochs)) * 1e3 << " ms" << std::endl;
+  std::cout << "Training took " << duration << " sec overall" << std::endl;
   std::cout << "Final cost on validation set: " << Evaluate(dist(generator), validation) << std::endl << std::endl;
 
 }

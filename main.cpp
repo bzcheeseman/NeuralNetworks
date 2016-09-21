@@ -24,16 +24,13 @@ double truncate(double in){
 int main(int argc, char *argv[]){
   gflags::ParseCommandLineFlags(&argc, &argv, true);
 
-  std::clock_t start;
-  double duration;
-
   std::vector<unsigned> topo = {4, 4, 3, 3};
-  std::vector<unsigned> dropout = {0, 1, 0, 0};
+  std::vector<unsigned> dropout = {0, 1, 1, 0};
   double eta = 5e-2;
   double l = 5e4; //this appears in a denominator - regularization parameter
   double gamma = 0.9;
   double epsilon = 1e-6;
-  std::string backprop = "SGD";
+  std::string backprop = "ADADELTA";
 
   dataReader *train = new dataReader("/Users/Aman/code/NeuralNetworks/data/iris_training.dat", 4, 3);
   dataReader *validate = new dataReader("/Users/Aman/code/NeuralNetworks/data/iris_validation.dat", 4, 3);
@@ -55,15 +52,12 @@ int main(int argc, char *argv[]){
 
   int len = train->data->count;
 
-  double goal = 5e-4;
+  double goal = 1e-4;
   long max_epochs = 1e9;
   double min_gradient = 5e-4;
 
-  start = std::clock();
-  net->Train(train->data, validate->data, goal, max_epochs, min_gradient);
-  duration = ( std::clock() - start ) / ((double) CLOCKS_PER_SEC);
 
-  std::cout << "Training took " << duration << " sec" << std::endl << std::endl;
+  net->Train(train->data, validate->data, goal, max_epochs, min_gradient);
 
 
   corr = 0;
