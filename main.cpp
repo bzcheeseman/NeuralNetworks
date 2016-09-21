@@ -10,6 +10,7 @@
 #include "include/dataReader.hpp"
 #include "include/Activations.hpp"
 #include "include/CostFunctions.hpp"
+#include "include/DropoutandRegularization.hpp"
 
 double truncate(double in){
   if (in >= 0.5){
@@ -26,19 +27,20 @@ int main(int argc, char *argv[]){
   std::clock_t start;
   double duration;
 
-  std::vector<unsigned> topo = {4, 3, 3};
+  std::vector<unsigned> topo = {4, 4, 3, 3};
+  std::vector<unsigned> dropout = {0, 1, 0, 0};
   double eta = 5e-2;
-  double l = 1e6; //this appears in a denominator - regularization parameter
-  double gamma = 0.95;
+  double l = 5e4; //this appears in a denominator - regularization parameter
+  double gamma = 0.9;
   double epsilon = 1e-6;
-  std::string backprop = "ADADELTA";
+  std::string backprop = "SGD";
 
   dataReader *train = new dataReader("/Users/Aman/code/NeuralNetworks/data/iris_training.dat", 4, 3);
   dataReader *validate = new dataReader("/Users/Aman/code/NeuralNetworks/data/iris_validation.dat", 4, 3);
   dataReader *test = new dataReader("/Users/Aman/code/NeuralNetworks/data/iris_test.dat", 4, 3);
 
-  FFNetwork *net = new FFNetwork(topo, eta, l, gamma, epsilon);
-  net->setFunctions(Tanh, TanhPrime, Identity, QuadCost, QuadCostPrime);
+  FFNetwork *net = new FFNetwork(topo, dropout, eta, l, gamma, epsilon);
+  net->setFunctions(Sigmoid, SigmoidPrime, Sign, Bernoulli, QuadCost, QuadCostPrime);
   net->setBackpropAlgorithm(backprop.c_str());
   int corr = 0;
   for (int i = 0; i < test->data->count; i++){
@@ -53,9 +55,9 @@ int main(int argc, char *argv[]){
 
   int len = train->data->count;
 
-  double goal = 5e-3;
+  double goal = 5e-4;
   long max_epochs = 1e9;
-  double min_gradient = 5e-3;
+  double min_gradient = 5e-4;
 
   start = std::clock();
   net->Train(train->data, validate->data, goal, max_epochs, min_gradient);
@@ -80,7 +82,9 @@ int main(int argc, char *argv[]){
   std::cout << "Truncated network output (>=0.5 = 1, <0.5 = 0):" << std::endl;
   std::cout << net->feedForward(test->data->inputs[0]).unaryExpr(&truncate) << std::endl << std::endl;
   std::cout << "Corresponding correct output:" << std::endl;
-  std::cout << test->data->outputs[0] << std::endl;
+  std::cout << test->data->outputs[0] << std::endl << std::endl;
+
+  std::cout << *net << std::endl;
 
 
 

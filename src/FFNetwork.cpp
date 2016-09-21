@@ -6,37 +6,39 @@
 
 using namespace Eigen;
 
-FFNetwork::FFNetwork(std::vector<unsigned> topology, double eta, double lamda, double gamma, double epsilon)
-        : topology(topology), eta(eta), lamda(lamda), gamma(gamma), epsilon(epsilon) {
+FFNetwork::FFNetwork(std::vector<unsigned> topology, std::vector<unsigned> dropout, double eta,
+                     double lamda, double gamma, double epsilon)
+        : topology(topology), dropout(dropout), eta(eta), lamda(lamda), gamma(gamma), epsilon(epsilon) {
 
-  w = new MatrixXd[topology.size()];
-  b = new VectorXd[topology.size()];
+  layers = new FFLayer[topology.size()];
 
-  zs = new VectorXd[topology.size()];
-  as = new VectorXd[topology.size()];
-
-
-  w[0] = MatrixXd::Zero(1,1);
-  b[0] = VectorXd::Zero(1);
+  layers[0].w = MatrixXd::Zero(1,1);
+  layers[0].b = VectorXd::Zero(1);
 
   for (int l = 1; l < topology.size(); l++){
-    w[l] = MatrixXd::Random(topology[l], topology[l-1]) / sqrt((double)topology[l-1]);
-    b[l] = VectorXd::Random(topology[l]) / sqrt((double)topology[l]);
-    zs[l] = VectorXd::Zero(topology[l]);
-    as[l] = VectorXd::Zero(topology[l]);
+    layers[l].w = MatrixXd::Random(topology[l], topology[l-1]) / sqrt((double)topology[l-1]);
+    layers[l].b = VectorXd::Random(topology[l]) / sqrt((double)topology[l]);
+    layers[l].z = VectorXd::Zero(topology[l]);
+    layers[l].a = VectorXd::Zero(topology[l]);
   }
+
+  backprop = ADADELTA;
 }
 
 FFNetwork::~FFNetwork() {
-  ;
+  delete layers;
 }
 
-void FFNetwork::setFunctions(double (*phi)(double), double (*phiprime)(double), double (*regularization)(double),
+void FFNetwork::setFunctions(double (*phi)(double),
+                             double (*phiprime)(double),
+                             double (*regularization)(double),
+                             double (*dropout_fn)(double),
                              VectorXd (*cost)(Eigen::VectorXd, Eigen::VectorXd),
                              VectorXd (*costprime)(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd)) {
   this->phi = phi;
   this->phiprime = phiprime;
   this->regularization = regularization;
+  this->dropout_fn = dropout_fn;
   this->cost = cost;
   this->costprime = costprime;
 }
@@ -55,41 +57,56 @@ void FFNetwork::setBackpropAlgorithm(const char *algorithm) {
 }
 
 Eigen::VectorXd FFNetwork::feedForward(Eigen::VectorXd input) {
-  zs[0] = VectorXd::Zero(topology[0]);
-  as[0] = input;
+  layers[0].z = VectorXd::Zero(topology[0]);
+  layers[0].a = input;
 
   int end = (int)this->topology.size();
 
 #pragma omp target teams distribute default(shared)
   for (int l = 1; l < end; l++){
-    zs[l] = w[l] * as[l-1] + b[l];
-    as[l] = zs[l].unaryExpr(phi);
+    layers[l].z = layers[l].w * (layers[l-1].a) + layers[l].b;
+    layers[l].a = (layers[l].z).unaryExpr(phi);
   }
 
-  return as[end-1];
+  return layers[end-1].a;
 }
 
 double FFNetwork::SGD(VectorXd input, VectorXd correct) {
 
-  VectorXd net_result = this->feedForward(input);
-  long layers = topology.size();
+  Eigen::VectorXd r;
 
-  VectorXd delta = costprime(net_result, correct, zs[layers-1]);
+  for (int i = 0; i < dropout.size()-1; i++){
+    if (dropout[i+1] == 1 && (i != 0 || i != dropout.size()-1)){ //drops out of the next layer - chop up the output of this layer
+      r = VectorXd::Ones((layers[i].a).size()).unaryExpr(dropout_fn);
+      layers[i].makeDropout(r);
+    }
+    else{
+      ;
+    }
+  }
+
+  VectorXd net_result = this->feedForward(input);
+  long num_layers = topology.size();
+
+  VectorXd delta = costprime(net_result, correct, layers[num_layers-1].z);
 
   double out = abs(delta.norm());
 
-  b[layers-1] -= eta * delta;
-  w[layers-1] -= eta * (delta * as[layers-2].transpose());
+  layers[num_layers-1].b -= eta * delta;
+  layers[num_layers-1].w -= eta * (delta * (layers[num_layers-2].a).transpose());
 
   int l;
 #pragma omp target teams distribute default(shared)
-  for (l = layers-2; l > 0; l--){
-    delta = (w[l+1].transpose() * delta).cwiseProduct(zs[l].unaryExpr(phiprime)); //recalculate delta
+  for (l = num_layers-2; l > 0; l--){
+    delta = ((layers[l+1].w).transpose() * delta).cwiseProduct((layers[l].z).unaryExpr(phiprime)); //recalculate delta
 
-    w[l] -= eta * (delta * as[l-1].transpose());  //update w
-    w[l] -= (eta/lamda) * w[l].unaryExpr(regularization); //regularization
-    b[l] -= eta * delta; //update b
+    layers[l].w -= eta * (delta * (layers[l-1].a).transpose());  //update w
+    layers[l].b -= eta * delta; //update b
 
+    if (dropout[l] != 1){
+      layers[l].w -= (eta/lamda) * (layers[l].w).unaryExpr(regularization); //regularization
+      layers[l].b -= (eta/lamda) * (layers[l].b).unaryExpr(regularization);
+    }
   }
 
   return out;
@@ -98,30 +115,45 @@ double FFNetwork::SGD(VectorXd input, VectorXd correct) {
 
 double FFNetwork::MomentumSGD(Eigen::VectorXd input, Eigen::VectorXd correct) {
 
-  VectorXd net_result = this->feedForward(input);
-  long layers = topology.size();
+  Eigen::VectorXd r;
 
-  VectorXd delta = costprime(net_result, correct, zs[layers-1]);
+  for (int i = 0; i < dropout.size()-1; i++){
+    if (dropout[i+1] == 1 && (i != 0 || i != dropout.size()-1)){
+      r = VectorXd::Ones((layers[i].a).size()).unaryExpr(dropout_fn);
+      layers[i].makeDropout(r);
+    }
+    else{
+      ;
+    }
+  }
+
+  VectorXd net_result = this->feedForward(input);
+  long num_layers = topology.size();
+
+  VectorXd delta = costprime(net_result, correct, layers[num_layers-1].z);
 
   double out = abs(delta.norm());
 
-  b[layers-1] -= eta * delta;
-  w[layers-1] -= eta * (delta * as[layers-2].transpose());
+  layers[num_layers-1].b -= eta * delta;
+  layers[num_layers-1].w -= eta * (delta * (layers[num_layers-2].a).transpose());
 
   static MatrixXd gradient;
 
   int l;
 #pragma omp target teams distribute lastprivate(gradient) default(shared)
-  for (l = layers-2; l > 0; l--){
+  for (l = num_layers-2; l > 0; l--){
     delta = gamma*delta;
-    delta += (w[l+1].transpose() * delta/gamma).cwiseProduct(zs[l].unaryExpr(phiprime)); //recalculate delta
+    delta += ((layers[l+1].w).transpose() * delta/gamma).cwiseProduct((layers[l].z).unaryExpr(phiprime)); //recalculate delta
 
-    gradient = (delta * as[l-1].transpose());
+    gradient = (delta * (layers[l-1].a).transpose());
 
-    w[l] -= eta * gradient;  //update w
-    w[l] -= (eta/lamda) * w[l].unaryExpr(regularization); //regularization
-    b[l] -= eta * delta; //update b
+    layers[l].w -= eta * gradient;  //update w
+    layers[l].b -= eta * delta; //update b
 
+    if (dropout[l] != 1){
+      layers[l].w -= (eta/lamda) * (layers[l].w).unaryExpr(regularization); //regularization
+      layers[l].b -= (eta/lamda) * (layers[l].b).unaryExpr(regularization); //regularization
+    }
   }
 
   return out;
@@ -129,42 +161,58 @@ double FFNetwork::MomentumSGD(Eigen::VectorXd input, Eigen::VectorXd correct) {
 
 double FFNetwork::Adadelta(Eigen::VectorXd input, Eigen::VectorXd correct) {
 
-  VectorXd net_result = this->feedForward(input);
-  long layers = topology.size();
+  Eigen::VectorXd r;
 
-  VectorXd delta = costprime(net_result, correct, zs[layers-1]);
+  for (int i = 0; i < dropout.size()-1; i++){
+    if (dropout[i+1] == 1 && (i != 0 || i != dropout.size()-1)){
+      r = VectorXd::Ones((layers[i].a).size()).unaryExpr(dropout_fn);
+      layers[i].makeDropout(r);
+    }
+    else{
+      ;
+    }
+  }
+
+  VectorXd net_result = this->feedForward(input);
+  long num_layers = this->topology.size();
+
+  VectorXd delta = this->costprime(net_result, correct, layers[num_layers-1].z);
 
   double out = abs(delta.norm());
 
-  b[layers-1] -= eta * delta;
-  w[layers-1] -= eta * (delta * as[layers-2].transpose());
-
-  static double msW = 10.*delta.squaredNorm();
-  static double msD = 10.*delta.squaredNorm();
+  static double msW = 1.*delta.squaredNorm();
+  static double msD = 1.*delta.squaredNorm();
 
   static MatrixXd gradient;
 
-  static double lr;
+  static double lr = sqrt(msD + epsilon)/sqrt(msW + epsilon);;
 
-  int l = layers-1;
+  layers[num_layers-1].b -= lr * delta;
+  layers[num_layers-1].w -= lr * (delta * (layers[num_layers-2].a).transpose());
+
+  int l = num_layers-1;
 
 #pragma omp target teams distribute
-  for (l = layers-2; l > 0; l--){
+  for (l = num_layers-2; l > 0; l--){
 
     msD = gamma * msD + (1.-gamma)*delta.squaredNorm();
 
-    delta = (w[l+1].transpose() * delta).cwiseProduct(zs[l].unaryExpr(phiprime)); //recalculate delta
+    delta = ((layers[l+1].w).transpose() * delta);
+    delta = delta.cwiseProduct((layers[l].z).unaryExpr(phiprime)); //recalculate delta
 
-    gradient = (delta * as[l-1].transpose());
+    gradient = (delta * (layers[l-1].a).transpose());
 
     msW = gamma * msW + (1.-gamma)*gradient.squaredNorm();
 
     lr = sqrt(msD + epsilon)/sqrt(msW + epsilon);
 
-    w[l] -= lr * gradient;  //update w
-    w[l] -= lr/lamda * w[l].unaryExpr(regularization); //regularization
-    b[l] -= lr * delta; //update b
+    layers[l].w -= lr * gradient;  //update w
+    layers[l].b -= lr * delta; //update b
 
+    if (dropout[l] != 1){
+      layers[l].w -= (lr/lamda) * (layers[l].w).unaryExpr(regularization); //regularization
+      layers[l].b -= (lr/lamda) * (layers[l].b).unaryExpr(regularization);
+    }
   }
 
   return out;
@@ -238,5 +286,16 @@ double FFNetwork::Evaluate(int rand_seed, dataSet<double> *validation) {
   double TotalCost = cost(netOut, corr).norm();
 
   return TotalCost;
+}
+
+std::ostream &operator<<(std::ostream &out, FFNetwork &net) {
+  for (int i = 0; i < net.topology.size(); i++){
+    out << "========= Layer " << i << " ============" << std::endl;
+    out << net.layers[i].w << std::endl << std::endl;
+    out << net.layers[i].b << std::endl;
+    out << "==============================" << std::endl;
+  }
+  out << std::endl;
+  return out;
 }
 

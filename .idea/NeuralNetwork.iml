@@ -5,9 +5,10 @@
       <sourceFolder url="file://$MODULE_DIR$/src/FFNetwork.cpp" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src/dataReader.cpp" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/include/FFNetwork.hpp" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/include/dataReader.hpp" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/include/CostFunctions.hpp" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/include/DropoutandRegularization.hpp" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/include/Activations.hpp" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/include/CostFunctions.hpp" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/include/dataReader.hpp" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/main.cpp" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/CMakeLists.txt" isTestSource="false" />
     </content>

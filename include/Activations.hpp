@@ -36,24 +36,4 @@ double TanhPrime(double input){
   return 1-pow(tanh(input), 2);
 }
 
-double Identity(double input){
-  return input;
-}
-
-double Sign(double input){
-  if (input > 0){
-    return 1.;
-  }
-  else if (input < 0){
-    return -1.;
-  }
-  else{
-    return 0.;
-  }
-}
-
-double Zero(double input){
-  return 0.;
-}
-
 #endif //NEURALNETWORKS_ACTIVATIONS_HPP
