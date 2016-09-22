@@ -29,7 +29,7 @@ or no regularization at all.
 The network is implemented such that it performs online learning - that is, weights are
 updated as training happens.
 
-Working on a CUDA implementation as well as fancier architectures.
+Working on a CUDA implementation as well as fancier architectures.  So far it is possible to run without CUDA, but it will take more work on my part to make it easy for the user to specify if they want to use CUDA or not, so for now it is required.
 
 To view the documentation with [electron](https://github.com/electron/electron/blob/master/docs/tutorial/quick-start.md), first install electron as detailed in the link and then simply
 ```
@@ -57,7 +57,7 @@ brew cask install cuda
 
 Note: To download cuDNN requires a free account for the accelerated computing program at NVIDIA.
 
-cuDNN setup from the TensorFlow [setup page](https://www.tensorflow.org/versions/r0.10/get_started/os_setup.html#prepare-environment-for-mac-os-x)
+cuDNN setup from the TensorFlow [setup page](https://www.tensorflow.org/versions/r0.10/get_started/os_setup.html#prepare-environment-for-mac-os-x) - clearest and simplest instructions I've seen for installing and setting up cuDNN
 
 ---------------------------------------------------------------------------
 Verbatim from TensorFlow setup page:
