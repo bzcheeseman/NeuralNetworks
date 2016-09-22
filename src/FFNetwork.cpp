@@ -1,8 +1,33 @@
 //
 // Created by Aman LaChapelle on 9/18/16.
 //
+// NeuralNetworks
+// Copyright (C) 2016  Aman LaChapelle
+//
+// Full license at NeuralNetworks/LICENSE.txt
+//
+
+/*
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include "../include/FFNetwork.hpp"
+
+/**
+ * @file src/FFNetwork.cpp
+ * @brief Defines functions and structures found in include/FFNetwork.hpp
+ */
 
 using namespace Eigen;
 
@@ -332,19 +357,102 @@ std::ostream &operator<<(std::ostream &out, FFNetwork &net) {
 }
 
 std::ofstream &operator<<(std::ofstream &out, const FFNetwork &net) {
-  //come up with a good way to write this to a file smartly
+  int n = net.topology.size();
 
-  for (int i = 0; i < net.topology.size(); i++){
+  out << n << std::endl;
+  out << '#' << std::endl;
 
-    out << net.layers[i].w << std::endl << std::endl;
-    out << net.layers[i].b << std::endl;
-
+  for (int i = 0; i < n; i++){
+    out << net.topology[i] << " ";
   }
   out << std::endl;
+  out << '#' << std::endl;
+
+  for (int i = 0; i < n; i++){
+    out << net.dropout[i] << " ";
+  }
+  out << std::endl;
+  out << '#' << std::endl;
+
+  out << net.eta << " " << net.lamda << " " << net.gamma << " " << net.epsilon << std::endl;
+  out << '#' << std::endl;
+
+  for (int i = 0; i < n; i++){
+    out << net.layers[i].w << std::endl;
+    out << '#' << std::endl;
+    out << net.layers[i].b.transpose() << std::endl;
+    out << '#' << std::endl;
+  }
+
+  std::string algorithm;
+  if (net.backprop == net.StochGradDescent){
+    algorithm = "SGD";
+  }
+  else if (net.backprop == net.MOMSGD){
+    algorithm = "MOMSGD";
+  }
+  else if (net.backprop == net.ADADELTA){
+    algorithm = "ADADELTA";
+  }
+
+  out << algorithm << std::endl;
+
   return out;
 }
 
-//std::ifstream& operator>>(std::ifstream &in, const char *filename) {
-//  return <#initializer#>;
-//}
+std::ifstream& operator>>(std::ifstream &in, FFNetwork *net) {
+  if (in) {
+    std::string line;
+
+    int net_size;
+    std::vector<unsigned> topology;
+    std::vector<unsigned> dropout;
+    double eta, lamda, gamma, epsilon;
+    FFLayer *layers;
+
+    for (int i = 0; i < 6; i++){
+      getline(in, line);
+      if (line[0] == '#'){
+        continue;
+      }
+
+      std::stringstream ss(line);
+      if (i == 0){
+        ss >> net_size;
+        topology.reserve(net_size);
+        dropout.reserve(net_size);
+        layers = new FFLayer[net_size];
+      }
+      else if (i == 2){
+        for (int j = 0; j < net_size; j++){
+          ss >> topology[i];
+        }
+      }
+      else if (i == 4){
+        for (int j = 0; j < net_size; j++){
+          ss >> dropout[i];
+        }
+      }
+      else{
+        ss >> eta, lamda, gamma, epsilon;
+      }
+
+    }
+
+    int i = 0;
+    while (getline(in, line)){
+      if (line[0] == '#'){
+        continue;
+      }
+
+      //figure out how to get w and b out of the file...lots of counters probably
+
+    }
+
+    net = new FFNetwork(topology, dropout, eta, lamda, gamma, epsilon);
+
+    in.close();
+
+  }
+}
 

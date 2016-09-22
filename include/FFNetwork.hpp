@@ -1,6 +1,26 @@
 //
 // Created by Aman LaChapelle on 9/18/16.
 //
+// NeuralNetworks
+// Copyright (C) 2016  Aman LaChapelle
+//
+// Full license at NeuralNetworks/LICENSE.txt
+//
+
+/*
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #ifndef NEURALNETWORK_NETWORK_HPP
 #define NEURALNETWORK_NETWORK_HPP
@@ -20,6 +40,20 @@
  * TODO: Other fancier networks!
  */
 
+/**
+ * @file include/FFNetwork.hpp
+ * @brief Holds a functioning FeedForward fully connected neural network.
+ *
+ * Holds method declarations for a functioning feed forward neural network.
+ */
+
+/**
+ * @struct FFLayer include/FFNetwork.hpp
+ * @brief Holds the information for one layer of a neural network.
+ *
+ * Encapsulates each layer of the FFNetwork class.  Makes it easier to implement dropout or convolution if one
+ * is so inclined.
+ */
 struct FFLayer{
   //! Weight between previous layer and this one
   Eigen::MatrixXd w;
@@ -41,6 +75,13 @@ struct FFLayer{
   }
 };
 
+/**
+ * @class FFNetwork include/FFNetwork.hpp src/FFNetwork.cpp
+ * @brief Holds a basic Feed Forward fully connected neural network.
+ *
+ * Contains a basic fully connected Feed Forward network.  Holds training and backpropagation as well as the raw numbers
+ * needed to make it work.
+ */
 class FFNetwork {
 
   //! The number of neurons in each layer
@@ -113,8 +154,10 @@ public:
 
   /**
    * Makes a prediction on the network.  Uses the trained network and forward propagates one input to return one output.
+   * Hides the feedForward function in favor of an overloaded operator.  Also truncates the network output which
+   * feedForward(Eigen::VectorXd) does not do.
    *
-   * @param input
+   * @param input Input vector to the network
    * @return Truncated network output
    */
   Eigen::VectorXi operator()(Eigen::VectorXd input);
@@ -128,44 +171,65 @@ public:
   Eigen::VectorXd feedForward(Eigen::VectorXd input);
 
   /**
+   * Standard Stochastic Gradient Descent - quite basic but it gets the job done.
    *
-   * @param input
-   * @param correct
-   * @return
+   * @param input Input to feed through the network
+   * @param correct The correct output that corresponds to the input we fed in.
+   * @return The gradient of the surface at the beginning of that backprop step.
    */
   double SGD(Eigen::VectorXd input, Eigen::VectorXd correct);
 
   /**
+   * An implementation of momentum-optimized stochastic gradient descent.  There was probably a paper on this
+   * but I can't find it - will happily cite it but otherwise just got the general idea from Michael Nielsen's book
+   * and the equations for implementation from everywhere.
    *
-   * @param input
-   * @param correct
-   * @return
+   * @param input Input to feed through the network
+   * @param correct The correct output that corresponds to the input we fed in.
+   * @return The gradient of the surface at the beginning of that backprop step.
    */
   double MomentumSGD(Eigen::VectorXd input, Eigen::VectorXd correct);
 
   /**
+   * Implementation of the AdaDelta backpropagation algorithm from
    *
-   * @param input
-   * @param correct
-   * @return
+   * ADADELTA: An Adaptive Learning Rate Method
+   * Zeiler, Matthew D.
+   * eprint arXiv:1212.5701
+   * 12/2012
+   *
+   * Generally takes the fewest epochs to converge, though each epoch takes longer on average.
+   *
+   * @param input Input to feed through the network
+   * @param correct The correct output that corresponds to the input we fed in.
+   * @return The gradient of the surface at the beginning of that backprop step.
    */
   double Adadelta(Eigen::VectorXd input, Eigen::VectorXd correct);
 
   /**
+   * Trains the network on the training and validation data provided.  The validation data is passed
+   * to Evaluate(int,dataSet<double>*), the training set is used for the actual training.
    *
-   * @param training
-   * @param validation
-   * @param goal
-   * @param max_epochs
-   * @param min_gradient
+   * goal is the cost goal (compared against result from Evaluate(int,dataSet<double>*)
+   * max_epochs is the final stopping criterion, generally set to a high value, we rely on the cost or gradient goals more.
+   * min_gradient is the smallest gradient we want to have before terminating.  Basically, when the gradient (the slope)
+   * is smaller than this number, we consider the ball to be at the bottom of the hill.
+   *
+   * @param training dataSet used for training
+   * @param validation dataSet used for validation
+   * @param goal Cost goal - compared against result from Evaluate(int,dataSet<double>*)
+   * @param max_epochs Final stopping criterion - cuts off the training when the number of epochs hits this
+   * @param min_gradient When the gradient is smaller than this number, we consider the ball to be at the bottom of the hill
    */
   void Train(dataSet<double> *training, dataSet<double> *validation, double goal, long max_epochs, double min_gradient);
 
   /**
+   * Evaluates the neural network on a random input from the validation set.  Takes in a random number and mods it with
+   * the length of the validation set to pick a testing dataset.
    *
-   * @param rand_seed
-   * @param validation
-   * @return
+   * @param rand_seed Random number used to choose which dataset to test on.
+   * @param validation Validation dataset - labeled examples we can use to test the network's performance.
+   * @return Total cost from that feedforward iteration - applies the cost function to the network output.
    */
   double Evaluate(int rand_seed, dataSet<double> *validation);
 
@@ -179,9 +243,9 @@ public:
   friend std::ostream& operator<<(std::ostream& out, FFNetwork &net);
 
   /**
-   * Writes the network details to a file.
+   * Writes the network details to a file.  Ignores the activation functions, etc. because that would be hard.
    *
-   * NW
+   * TODO: Add the network functions to the file (activations, cost, regularization, dropout, derivatives)
    *
    * @param out Outgoing file stream
    * @param net The network to write to a file
@@ -192,13 +256,13 @@ public:
   /**
    * Reads from the file outputted by operator<<(std::ofstream&,FFNetwork&).  Not guaranteed to work on anything else.
    *
-   * NW
+   * NW - really not working
    *
    * @param in Incoming file stream
    * @param filename The name of the file that holds the network details
    * @return A network initialized from the weights in the file!
    */
-//  friend std::ifstream& operator>>(std::ifstream& in, const char *filename);
+  friend std::ifstream& operator>>(std::ifstream& in, FFNetwork *net);
 };
 
 
