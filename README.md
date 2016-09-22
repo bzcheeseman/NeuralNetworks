@@ -60,7 +60,7 @@ Note: To download cuDNN requires a free account for the accelerated computing pr
 cuDNN setup from the TensorFlow [setup page](https://www.tensorflow.org/versions/r0.10/get_started/os_setup.html#prepare-environment-for-mac-os-x)
 
 ---------------------------------------------------------------------------
-From TensorFlow setup page:
+Verbatim from TensorFlow setup page:
 ```
 $ sudo mv include/cudnn.h /Developer/NVIDIA/CUDA-7.5/include/
 $ sudo mv lib/libcudnn* /Developer/NVIDIA/CUDA-7.5/lib
