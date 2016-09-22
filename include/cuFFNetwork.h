@@ -31,7 +31,7 @@
 #include <cublas_v2.h>
 #include <cudnn.h>
 
-/**
+/*
  * Alright, time for a CUDNN implementation of what I have already!
  */
 

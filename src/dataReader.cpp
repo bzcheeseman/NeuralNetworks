@@ -24,6 +24,12 @@
 
 #include "../include/dataReader.hpp"
 
+/**
+ * @file include/dataReader.cpp
+ * @brief Defines methods for reading and storing network training data.
+ */
+
+
 using namespace std;
 
 DEFINE_bool(debug, false, "Sets the debug variable to enable(disable) extra logging");

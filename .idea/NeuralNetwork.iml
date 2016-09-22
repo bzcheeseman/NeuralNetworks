@@ -10,6 +10,7 @@
       <sourceFolder url="file://$MODULE_DIR$/include/CostFunctions.hpp" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/include/dataReader.hpp" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/main.cpp" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/docs/Doxyfile" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/CMakeLists.txt" isTestSource="false" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />

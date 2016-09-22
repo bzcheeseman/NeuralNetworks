@@ -34,10 +34,7 @@
 #include "DropoutandRegularization.hpp"
 
 /*
- * TODO: read from/write to file
- * TODO: speedup for larger networks - cuDNN - look at exampke
- *  TODO: Convolution layers - probably not useful until we get to bigger networks
- * TODO: Other fancier networks!
+ * TODO: read from file
  */
 
 /**
@@ -138,6 +135,16 @@ public:
    */
   ~FFNetwork();
 
+  /**
+   * Sets the network functions!
+   *
+   * @param phi Activation function
+   * @param phiprime Derivative of the activation function
+   * @param regularization The regularization function - Identity is L2, Sign is L1, and Zero is none
+   * @param dropout_fn The dropout function to apply to each dropout layer (usually just bernoulli probability)
+   * @param cost The cost function
+   * @param costprime Derivative of the cost function
+   */
   void setFunctions(double (*phi)(double),
                     double (*phiprime)(double),
                     double (*regularization)(double),
