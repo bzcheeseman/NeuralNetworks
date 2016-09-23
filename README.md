@@ -43,7 +43,7 @@ Dependencies:
 cmake
 Eigen
 gflags
-CUDA (>= 7.0) - including cuBLAS especially
+CUDA (>= 7.5) - including cuBLAS especially
 CUDA - cuDNN  (>= 5.0)
 ```
 

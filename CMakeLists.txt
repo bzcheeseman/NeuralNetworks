@@ -13,7 +13,7 @@ if(DOXYGEN_FOUND)
             )
 endif(DOXYGEN_FOUND)
 
-find_package(CUDA 7.0 REQUIRED)
+find_package(CUDA 7.5 REQUIRED)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     message("Debug mode")
@@ -24,35 +24,37 @@ else()
             -gencode;arch=compute_52,code=sm_52;-gencode;arch=compute_50,code=compute_50;-std=c++11;-O3;-DNDEBUG;-Xcompiler;-DNDEBUG)
 endif()
 
-include_directories($ENV{CUDNN_PATH} $ENV{CUDNN_PATH}/include)
-link_directories($ENV{CUDNN_PATH})
+set(CUDA_PROPAGATE_HOST_FLAGS OFF)
 
-include_directories(kernels utility)
-
-link_directories()
-
-set(CMAKE_CXX_COMPILER /usr/local/bin/g++-6)
+include_directories(/usr/local/cuda /usr/local/cuda/include)
+link_directories(/usr/local/cuda/lib)
+link_directories(/usr/local/lib /usr/lib)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -fopenmp")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -fopenmp")
 
 find_package(eigen3 REQUIRED)
-include_directories("/usr/local/include/eigen3")
+include_directories(/usr/local/include/eigen3)
 
-set(SOURCE_FILES main.cpp
-        src/FFNetwork.cpp
-        include/FFNetwork.hpp
-        src/dataReader.cpp
-        include/dataReader.hpp
-        include/Activations.hpp
-        include/CostFunctions.hpp
-        include/DropoutandRegularization.hpp
-#        src/cuFFNetwork.cu
-#        include/cuFFNetwork.h
+include_directories(/usr/local/include/gflags)
+
+set(SOURCE_FILES
+#        main.cpp
+#        src/FFNetwork.cpp
+#        include/FFNetwork.hpp
+#        src/dataReader.cpp
+#        include/dataReader.hpp
+#        include/Activations.hpp
+#        include/CostFunctions.hpp
+#        include/DropoutandRegularization.hpp
+        src/cuFFNetwork.cu
+        include/cuFFNetwork.h
+        src/cudaKernels.cu
+        include/cudaKernels.hpp
+        main.cu
 )
 
 cuda_add_executable(NeuralNetworks ${SOURCE_FILES})
 cuda_add_cublas_to_target(NeuralNetworks)
 
-target_link_libraries(NeuralNetworks gflags)
-target_link_libraries(NeuralNetworks cudnn)
+target_link_libraries(NeuralNetworks gflags cudnn curand)
