@@ -22,7 +22,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "include/cuFFNetwork.h"
+#include "include/cuFFNetwork.hpp"
 
 int main(int argc, char *argv[]){
 
@@ -33,7 +33,16 @@ int main(int argc, char *argv[]){
   cuLayer hiddens(num_inputs, num_hidden);
   cuLayer outputs(num_hidden, num_outputs);
 
+  float fakein[4] = {1.2f, 1.1f, 1.3f, 0.2f};
+
   std::cout << hiddens << std::endl;
+
+  cuFFNetwork net (0, 1, hiddens, outputs);
+  std::cout << net.feedForward(fakein) << std::endl;
+
+  std::cout << hiddens << std::endl;
+
+
 
 
   return 0;

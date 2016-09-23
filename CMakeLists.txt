@@ -48,7 +48,7 @@ set(SOURCE_FILES
 #        include/CostFunctions.hpp
 #        include/DropoutandRegularization.hpp
         src/cuFFNetwork.cu
-        include/cuFFNetwork.h
+        include/cuFFNetwork.hpp
         src/cudaKernels.cu
         include/cudaKernels.hpp
         main.cu

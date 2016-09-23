@@ -25,20 +25,16 @@
 
 __global__ void fillOnes(float *vec, int size){
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx < size){
-    vec[idx] = 1.0f;
-  }
-  else{
+  if (idx >= size){
     return;
   }
+  vec[idx] = 1.0f;
 }
 
 __global__ void fillZeros(float *vec, int size){
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx < size){
-    vec[idx] = 0.0f;
-  }
-  else{
+  if (idx >= size){
     return;
   }
+  vec[idx] = 0.0f;
 }

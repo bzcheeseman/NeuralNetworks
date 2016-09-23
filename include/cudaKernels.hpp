@@ -25,6 +25,8 @@
 #ifndef NEURALNETWORKS_CUDAKERNELS_HPP
 #define NEURALNETWORKS_CUDAKERNELS_HPP
 
+//! These DO NOT WORK for some reason
+
 __global__ void fillOnes(float *vec, int size);
 
 __global__ void fillZeros(float *vec, int size);
