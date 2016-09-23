@@ -112,28 +112,28 @@ struct cuLayer{
 
     checkCudaErrors(cudaSetDevice(0));
 
+    float *devicedata;
+    float mean = (float)0.0;
+    float stddev = (float)(1.0/(float)sqrt( (float)in ));
+
     curandGenerator_t gen;
     //create generator
     checkCurandErrors(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT));
     //set generator seed
     auto now = std::chrono::high_resolution_clock::now();
     std::uint64_t nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
-    checkCurandErrors(curandSetPseudoRandomGeneratorSeed(gen, nanos));
-    //malloc device data
-    float *devicedata;
-    float mean = (float)0.0;
-    float stddev = (float)(1.0/(float)sqrt( (float)in ));
+    checkCurandErrors(curandSetPseudoRandomGeneratorSeed(gen, nanos)); //set seed here
 
     checkCudaErrors(cudaMalloc((void **)&devicedata, (in*out)*sizeof(float))); //malloc size of weights
     checkCurandErrors(curandGenerateNormal(gen, devicedata, (std::size_t)(in*out + (in*out)%2), mean, stddev)); //generate numbers
     checkCudaErrors(cudaMemcpy(w.data(), devicedata, (in*out)*sizeof(float), cudaMemcpyDeviceToHost)); //copy it back
     checkCudaErrors(cudaFree(devicedata)); //free pointer to realloc
 
-//    checkCudaErrors(cudaMalloc((void **)&devicedata, (out)*sizeof(float))); //realloc for biases
-//    checkCurandErrors(curandGenerateNormal(gen, devicedata, (std::size_t)(out + out%2), mean, stddev)); //generate numbers
-//    checkCudaErrors(cudaMemcpy(b.data(), devicedata, (out)*sizeof(float), cudaMemcpyDeviceToHost)); //copy it back
-//
-//    checkCudaErrors(cudaFree(devicedata)); //free pointer
+    checkCudaErrors(cudaMalloc((void **)&devicedata, (out)*sizeof(float))); //realloc for biases
+    checkCurandErrors(curandGenerateNormal(gen, devicedata, (std::size_t)(out + out%2), mean, stddev)); //generate numbers
+    checkCudaErrors(cudaMemcpy(b.data(), devicedata, (out)*sizeof(float), cudaMemcpyDeviceToHost)); //copy it back
+
+    checkCudaErrors(cudaFree(devicedata)); //free pointer
     checkCurandErrors(curandDestroyGenerator(gen));
 
     fillZeros<<<BW, BW>>>(z.data(), out); //fill with zeros so we know what's there
