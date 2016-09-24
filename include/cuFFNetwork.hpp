@@ -89,6 +89,8 @@ static inline unsigned int RoundUp(unsigned int nominator, unsigned int denomina
 
 struct cuLayer{
 
+  int gpuid;
+
   int in, out;
 
   cudnnTensorDescriptor_t weight;
@@ -108,9 +110,12 @@ struct cuLayer{
   Eigen::VectorXf a;
   float *dev_a;
 
-  cuLayer(int in, int out);
+  cuLayer(int in, int out, int gpuid);
+  ~cuLayer();
 
-  friend std::ostream &operator<<(std::ostream &out, cuLayer &layer);
+  void initTensors(int batchSize);
+
+  void setActivation(cudnnActivationMode_t cudnnActivationFunc);
 
   void copy_to_device();
 
@@ -121,6 +126,8 @@ struct cuLayer{
   //! CHECK COMPUTATIONS - NOT TOTALLY CONVINCED THEY'RE RIGHT - esp. cublas
   //! might not matter though - as long as it happens the same way every time maybe it just doesn't matter?
   void feedThroughLayer(float *device_ptr_input, int len, int batchSize, cublasHandle_t cublasHandle, cudnnHandle_t cudnnHandle);
+
+  friend std::ostream &operator<<(std::ostream &out, cuLayer &layer);
 
 };
 
@@ -138,10 +145,6 @@ class cuFFNetwork {
   cudnnHandle_t cudnnHandle;
 
   cudnnTensorDescriptor_t input_data;
-
-  cudnnOpTensorDescriptor_t mult;
-  cudnnOpTensorDescriptor_t add;
-
 
 public:
   cuFFNetwork(int gpuid, int batchSize, cuLayer &hidden, cuLayer &outputs);
