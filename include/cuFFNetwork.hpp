@@ -48,11 +48,6 @@
 
 #define BW 128
 
-static inline unsigned int RoundUp(unsigned int nominator, unsigned int denominator)
-{
-  return (nominator + denominator - 1) / denominator;
-}
-
 #define FatalError(s) do {                                             \
     std::stringstream _where, _message;                                \
     _where << __FILE__ << ':' << __LINE__;                             \
@@ -85,35 +80,40 @@ static inline unsigned int RoundUp(unsigned int nominator, unsigned int denomina
       FatalError(_error.str());                                        \
     }                                                                  \
 } while (0)
-// << CurandGetErrorString(status);
 
-struct cuLayer{
+struct cuFFLayer{
 
   int gpuid;
 
   int in, out;
 
-  cudnnTensorDescriptor_t weight;
-  Eigen::MatrixXf w; //careful - column-major
+  /*
+   * n = batchSize
+   * c = number of outputs from that tensor (feature maps ~ map input into output) - properly only need one
+   *      tensor per layer.
+   * h = height of feature maps = 1 for fully connected layer (nodes don't depend on each other)
+   * w = width of feature maps = 1 for fully connected layer (nodes don't depend on each other)
+   */
+
+  Eigen::MatrixXf w;
   float *dev_w;
 
-  cudnnTensorDescriptor_t bias;
   Eigen::VectorXf b;
   float *dev_b;
 
-  cudnnTensorDescriptor_t zs;
   Eigen::VectorXf z;
   float *dev_z;
 
   cudnnActivationDescriptor_t activation;
-  cudnnTensorDescriptor_t as;
   Eigen::VectorXf a;
   float *dev_a;
 
-  cuLayer(int in, int out, int gpuid);
-  ~cuLayer();
+  cudnnTensorDescriptor_t layerTensor; //apply activation within the layer which apparently works well.
 
-  void initTensors(int batchSize);
+  cuFFLayer(int in, int out, int gpuid);
+  ~cuFFLayer();
+
+  void initTensor(int batchSize);
 
   void setActivation(cudnnActivationMode_t cudnnActivationFunc);
 
@@ -123,11 +123,13 @@ struct cuLayer{
 
   void free_device_ptr();
 
-  //! CHECK COMPUTATIONS - NOT TOTALLY CONVINCED THEY'RE RIGHT - esp. cublas
+  //! CHECK COMPUTATIONS - NOT TOTALLY CONVINCED THEY'RE RIGHT - specifically cublas (although the dimensions are right
+  //! and nothing explodes...)
+  //! Also turns out cublas is column-major too so I'm good - just check that cudnn is too.
   //! might not matter though - as long as it happens the same way every time maybe it just doesn't matter?
   void feedThroughLayer(float *device_ptr_input, int len, int batchSize, cublasHandle_t cublasHandle, cudnnHandle_t cudnnHandle);
 
-  friend std::ostream &operator<<(std::ostream &out, cuLayer &layer);
+  friend std::ostream &operator<<(std::ostream &out, cuFFLayer &layer);
 
 };
 
@@ -138,8 +140,8 @@ class cuFFNetwork {
 
   enum {ReLU, Sigmoid, Tanh} activation_func ;
 
-  cuLayer& hidden_layer;
-  cuLayer& output_layer;
+  cuFFLayer& hidden_layer;
+  cuFFLayer& output_layer;
 
   cublasHandle_t cublasHandle;
   cudnnHandle_t cudnnHandle;
@@ -147,7 +149,7 @@ class cuFFNetwork {
   cudnnTensorDescriptor_t input_data;
 
 public:
-  cuFFNetwork(int gpuid, int batchSize, cuLayer &hidden, cuLayer &outputs);
+  cuFFNetwork(int gpuid, int batchSize, cuFFLayer &hidden, cuFFLayer &outputs);
   ~cuFFNetwork();
 
   Eigen::VectorXf feedForward(float *data);

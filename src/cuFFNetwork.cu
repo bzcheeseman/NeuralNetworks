@@ -28,7 +28,7 @@
  * cuLayer
  *******************************************/
 
-cuLayer::cuLayer(int in, int out, int gpuid) : in(in), out(out), gpuid(gpuid) {
+cuFFLayer::cuFFLayer(int in, int out, int gpuid) : in(in), out(out), gpuid(gpuid) {
   w = Eigen::MatrixXf(out, in);
   b = Eigen::VectorXf(out);
   z = Eigen::VectorXf(out);
@@ -76,40 +76,30 @@ cuLayer::cuLayer(int in, int out, int gpuid) : in(in), out(out), gpuid(gpuid) {
   checkCudaErrors(cudaDeviceSynchronize());
 }
 
-cuLayer::~cuLayer() {
+cuFFLayer::~cuFFLayer() {
   checkCudaErrors(cudaSetDevice(gpuid));
-  checkCUDNN(cudnnDestroyTensorDescriptor(weight));
-  checkCUDNN(cudnnDestroyTensorDescriptor(bias));
-  checkCUDNN(cudnnDestroyTensorDescriptor(zs));
-  checkCUDNN(cudnnDestroyTensorDescriptor(as));
+  checkCUDNN(cudnnDestroyTensorDescriptor(layerTensor));
   checkCUDNN(cudnnDestroyActivationDescriptor(activation));
 }
 
-void cuLayer::initTensors(int batchSize) {
+void cuFFLayer::initTensor(int batchSize) {
 
   checkCudaErrors(cudaSetDevice(gpuid));
 
-  checkCUDNN(cudnnCreateTensorDescriptor(&(weight))); // init weight tensor for hidden layer
-  checkCUDNN(cudnnCreateTensorDescriptor(&(bias))); // init bias tensor for hidden layer
-  checkCUDNN(cudnnCreateTensorDescriptor(&(zs))); // init z tensor for hiddens
-  checkCUDNN(cudnnCreateTensorDescriptor(&(as))); // init a tensor for hiddens
+  checkCUDNN(cudnnCreateTensorDescriptor(&(layerTensor))); // init weight tensor for hidden layer
 
-  //not sure if this is right...hopefully it is though
-  checkCUDNN(cudnnSetTensor4dDescriptor(weight, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, batchSize, out, 1, 1));
-  checkCUDNN(cudnnSetTensor4dDescriptor(bias, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, batchSize, out, 1, 1));
-  checkCUDNN(cudnnSetTensor4dDescriptor(zs, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, batchSize, out, 1, 1));
-  checkCUDNN(cudnnSetTensor4dDescriptor(as, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, batchSize, out, 1, 1));
+  checkCUDNN(cudnnSetTensor4dDescriptor(layerTensor, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, batchSize, out, 1, 1));
 
 }
 
-void cuLayer::setActivation(cudnnActivationMode_t cudnnActivationFunc) {
+void cuFFLayer::setActivation(cudnnActivationMode_t cudnnActivationFunc) {
   checkCudaErrors(cudaSetDevice(gpuid));
 
   checkCUDNN(cudnnCreateActivationDescriptor(&(activation)));
   checkCUDNN(cudnnSetActivationDescriptor(activation, cudnnActivationFunc, CUDNN_PROPAGATE_NAN, 0.0));
 }
 
-void cuLayer::copy_to_device() {
+void cuFFLayer::copy_to_device() {
 
   checkCudaErrors(cudaSetDevice(gpuid));
 
@@ -127,7 +117,7 @@ void cuLayer::copy_to_device() {
 
 }
 
-void cuLayer::copy_from_device() {
+void cuFFLayer::copy_from_device() {
 
   checkCudaErrors(cudaSetDevice(gpuid));
 
@@ -138,7 +128,7 @@ void cuLayer::copy_from_device() {
 
 }
 
-void cuLayer::free_device_ptr() {
+void cuFFLayer::free_device_ptr() {
 
   checkCudaErrors(cudaSetDevice(gpuid));
 
@@ -149,7 +139,7 @@ void cuLayer::free_device_ptr() {
 
 }
 
-void cuLayer::feedThroughLayer(float *device_ptr_input, int len, int batchSize, cublasHandle_t cublasHandle, cudnnHandle_t cudnnHandle) {
+void cuFFLayer::feedThroughLayer(float *device_ptr_input, int len, int batchSize, cublasHandle_t cublasHandle, cudnnHandle_t cudnnHandle) {
   assert(len == in);
 
   checkCudaErrors(cudaSetDevice(gpuid));
@@ -171,11 +161,11 @@ void cuLayer::feedThroughLayer(float *device_ptr_input, int len, int batchSize, 
                               &one, dev_z, out));
 
   checkCUDNN(cudnnActivationForward(cudnnHandle, activation,
-                                    &one, zs, dev_z,
-                                    &zero, as, dev_a));
+                                    &one, layerTensor, dev_z,
+                                    &zero, layerTensor, dev_a)); //apply activation within the layer, before giving away output
 }
 
-std::ostream &operator<<(std::ostream &out, cuLayer &layer) {
+std::ostream &operator<<(std::ostream &out, cuFFLayer &layer) {
   out << "Inputs: " << layer.in << " Outputs: " << layer.out << std::endl;
   out << "==========Weights==========\n" << layer.w << std::endl;
   out << "\n==========Bias==========\n"<< layer.b << std::endl;
@@ -189,7 +179,7 @@ std::ostream &operator<<(std::ostream &out, cuLayer &layer) {
  * cuFFNetwork
  *******************************************/
 
-cuFFNetwork::cuFFNetwork(int gpuid, int batchSize, cuLayer& hidden_layer, cuLayer& output_layer):
+cuFFNetwork::cuFFNetwork(int gpuid, int batchSize, cuFFLayer& hidden_layer, cuFFLayer& output_layer):
         gpuid(gpuid), batchSize(batchSize), hidden_layer(hidden_layer), output_layer(output_layer) {
 
   //set up device
@@ -202,9 +192,9 @@ cuFFNetwork::cuFFNetwork(int gpuid, int batchSize, cuLayer& hidden_layer, cuLaye
 
   checkCUDNN(cudnnCreateTensorDescriptor(&input_data)); // init tensor for input data
 
-  this->hidden_layer.initTensors(batchSize);
+  this->hidden_layer.initTensor(batchSize);
 
-  this->output_layer.initTensors(batchSize);
+  this->output_layer.initTensor(batchSize);
 
   if (activation_func == ReLU){
     this->hidden_layer.setActivation(CUDNN_ACTIVATION_RELU);

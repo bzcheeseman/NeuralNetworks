@@ -30,15 +30,16 @@ int main(int argc, char *argv[]){
 
   int num_inputs = 4, num_hidden = 3, num_outputs = 3;
 
-  cuLayer hiddens(num_inputs, num_hidden, 0);
-  cuLayer outputs(num_hidden, num_outputs, 0);
+  cuFFLayer hiddens(num_inputs, num_hidden, 0);
+  cuFFLayer outputs(num_hidden, num_outputs, 0);
 
   float fakein[4] = {1.2f, 1.1f, 1.3f, 0.2f};
 
   std::cout << hiddens << std::endl;
 
   cuFFNetwork net (0, 1, hiddens, outputs);
-  std::cout << net.feedForward(fakein) << std::endl;
+  net.feedForward(fakein);
+//  std::cout << net.feedForward(fakein) << std::endl;
 
   std::cout << hiddens << std::endl;
 
