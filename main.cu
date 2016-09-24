@@ -34,6 +34,7 @@ int main(int argc, char *argv[]){
   cuFFLayer outputs(num_hidden, num_outputs, 0);
 
   float fakein[4] = {1.2f, 1.1f, 1.3f, 0.2f};
+  float fakeout[3] = {1.0f, 0.0f, 1.0f};
 
   std::cout << hiddens << std::endl;
 
@@ -42,6 +43,8 @@ int main(int argc, char *argv[]){
 //  std::cout << net.feedForward(fakein) << std::endl;
 
   std::cout << hiddens << std::endl;
+
+  net.backPropagate(fakeout);
 
 
 

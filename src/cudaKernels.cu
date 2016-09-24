@@ -38,3 +38,12 @@ __global__ void fillZeros(float *vec, int size){
   }
   vec[idx] = 0.0f;
 }
+
+__global__ void costFunc(float *vec1, int size, int batchSize, float* vec2){
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= batchSize*size)
+    return;
+
+  vec1[idx] = 1.0f/(float)batchSize * pow((vec2[idx] - vec1[idx]), 2);
+
+}

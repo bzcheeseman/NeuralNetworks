@@ -117,6 +117,8 @@ struct cuFFLayer{
 
   void setActivation(cudnnActivationMode_t cudnnActivationFunc);
 
+  // keep these separate - want to leave all the info on the gpu during the backprop process (feedforward, gradients, etc.)
+  // only copy them back for updates (maybe even do updates on the device and copy it back when the training is done?)
   void copy_to_device();
 
   void copy_from_device();
@@ -125,7 +127,7 @@ struct cuFFLayer{
 
   //! CHECK COMPUTATIONS - NOT TOTALLY CONVINCED THEY'RE RIGHT - specifically cublas (although the dimensions are right
   //! and nothing explodes...)
-  //! Also turns out cublas is column-major too so I'm good - just check that cudnn is too.
+  //! Also turns out cublas is column-major too so I'm good - just check that cudnn is too - thougth it might not matter either
   //! might not matter though - as long as it happens the same way every time maybe it just doesn't matter?
   void feedThroughLayer(float *device_ptr_input, int len, int batchSize, cublasHandle_t cublasHandle, cudnnHandle_t cudnnHandle);
 
@@ -153,6 +155,8 @@ public:
   ~cuFFNetwork();
 
   Eigen::VectorXf feedForward(float *data);
+
+  double backPropagate(float *correct_out);
 
 };
 

@@ -26,7 +26,7 @@ endif()
 
 set(CUDA_PROPAGATE_HOST_FLAGS OFF)
 
-include_directories(/usr/local/cuda /usr/local/cuda/include)
+include_directories(/usr/local/cuda/include /usr/local/cuda)
 link_directories(/usr/local/cuda/lib)
 link_directories(/usr/local/lib /usr/lib)
 

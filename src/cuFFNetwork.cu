@@ -24,6 +24,12 @@
 
 #include "../include/cuFFNetwork.hpp"
 
+static inline unsigned int RoundUp(unsigned int numerator, unsigned int denominator)
+{
+  return (numerator + denominator - 1) / denominator;
+}
+
+
 /*******************************************
  * cuLayer
  *******************************************/
@@ -86,7 +92,7 @@ void cuFFLayer::initTensor(int batchSize) {
 
   checkCudaErrors(cudaSetDevice(gpuid));
 
-  checkCUDNN(cudnnCreateTensorDescriptor(&(layerTensor))); // init weight tensor for hidden layer
+  checkCUDNN(cudnnCreateTensorDescriptor(&(layerTensor))); // init tensor for this layer
 
   checkCUDNN(cudnnSetTensor4dDescriptor(layerTensor, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, batchSize, out, 1, 1));
 
@@ -255,4 +261,34 @@ Eigen::VectorXf cuFFNetwork::feedForward(float *data) {
   checkCudaErrors(cudaDeviceSynchronize());
 
   return output_layer.a;
+}
+
+double cuFFNetwork::backPropagate(float *correct_out) {
+
+  checkCudaErrors(cudaSetDevice(gpuid));
+  float one = 1.0f, zero = 0.0f;
+
+  hidden_layer.copy_to_device();
+  output_layer.copy_to_device();
+
+  float *dev_loss;
+  checkCudaErrors(cudaMalloc(&dev_loss, output_layer.out * sizeof(float)));
+  checkCudaErrors(cudaMemcpyAsync(dev_loss, output_layer.dev_a, output_layer.out * sizeof(float), cudaMemcpyDeviceToDevice));
+
+  float *dev_correct;
+  checkCudaErrors(cudaMalloc(&dev_correct, output_layer.out * sizeof(float)));
+  checkCudaErrors(cudaMemcpyAsync(dev_correct, correct_out, output_layer.out * sizeof(float), cudaMemcpyHostToDevice));
+
+  //compute error at the last layer - need to update this probably
+  costFunc<<<RoundUp(batchSize, BW),BW>>>(dev_loss, output_layer.out, batchSize, dev_correct);
+
+  //think about activationBackward function call carefully - it's gotta be simple-ish
+//  checkCUDNN(cudnnActivationBackward(cudnnHandle, output_layer.activation,
+//                                     &one, output_layer.layerTensor, output_layer.dev_a, output_layer.layerTensor, dev_loss, ))
+
+  Eigen::VectorXf readin (output_layer.out);
+  checkCudaErrors(cudaMemcpyAsync(readin.data(), dev_loss, output_layer.out * sizeof(float), cudaMemcpyDeviceToHost));
+
+  std::cout << readin << std::endl;
+
 }
