@@ -88,27 +88,39 @@ static inline unsigned int RoundUp(unsigned int nominator, unsigned int denomina
 // << CurandGetErrorString(status);
 
 struct cuLayer{
+
   int in, out;
 
   cudnnTensorDescriptor_t weight;
   Eigen::MatrixXf w; //careful - column-major
+  float *dev_w;
 
   cudnnTensorDescriptor_t bias;
   Eigen::VectorXf b;
+  float *dev_b;
 
   cudnnTensorDescriptor_t zs;
   Eigen::VectorXf z;
+  float *dev_z;
 
   cudnnActivationDescriptor_t activation;
   cudnnTensorDescriptor_t as;
   Eigen::VectorXf a;
-
-
+  float *dev_a;
 
   cuLayer(int in, int out);
 
   friend std::ostream &operator<<(std::ostream &out, cuLayer &layer);
 
+  void copy_to_device();
+
+  void copy_from_device();
+
+  void free_device_ptr();
+
+  //! CHECK COMPUTATIONS - NOT TOTALLY CONVINCED THEY'RE RIGHT - esp. cublas
+  //! might not matter though - as long as it happens the same way every time maybe it just doesn't matter?
+  void feedThroughLayer(float *device_ptr_input, int len, int batchSize, cublasHandle_t cublasHandle, cudnnHandle_t cudnnHandle);
 
 };
 

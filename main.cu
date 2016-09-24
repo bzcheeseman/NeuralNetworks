@@ -38,7 +38,7 @@ int main(int argc, char *argv[]){
   std::cout << hiddens << std::endl;
 
   cuFFNetwork net (0, 1, hiddens, outputs);
-  std::cout << net.feedForward(fakein) << std::endl;
+//  std::cout << net.feedForward(fakein) << std::endl;
 
   std::cout << hiddens << std::endl;
 

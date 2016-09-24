@@ -85,6 +85,63 @@ std::ostream &operator<<(std::ostream &out, cuLayer &layer) {
   return out;
 }
 
+void cuLayer::copy_to_device() {
+
+  checkCudaErrors(cudaMalloc(&dev_w, in*out * sizeof(float)));
+  checkCudaErrors(cudaMemcpyAsync(dev_w, &w.data()[0], in*out * sizeof(float), cudaMemcpyHostToDevice));
+
+  checkCudaErrors(cudaMalloc(&dev_b, out * sizeof(float)));
+  checkCudaErrors(cudaMemcpyAsync(dev_b, &b.data()[0], out * sizeof(float), cudaMemcpyHostToDevice));
+
+  checkCudaErrors(cudaMalloc(&dev_z, out * sizeof(float)));
+  checkCudaErrors(cudaMemcpyAsync(dev_z, &z.data()[0], out * sizeof(float), cudaMemcpyHostToDevice));
+
+  checkCudaErrors(cudaMalloc(&dev_a, out * sizeof(float)));
+  checkCudaErrors(cudaMemcpyAsync(dev_a, &a.data()[0], out * sizeof(float), cudaMemcpyHostToDevice));
+
+}
+
+void cuLayer::copy_from_device() {
+
+  checkCudaErrors(cudaMemcpyAsync(w.data(), dev_w, out*in*sizeof(float), cudaMemcpyDeviceToHost));
+  checkCudaErrors(cudaMemcpyAsync(b.data(), dev_b, out*sizeof(float), cudaMemcpyDeviceToHost));
+  checkCudaErrors(cudaMemcpyAsync(z.data(), dev_z, out*sizeof(float), cudaMemcpyDeviceToHost));
+  checkCudaErrors(cudaMemcpyAsync(a.data(), dev_a, out*sizeof(float), cudaMemcpyDeviceToHost));
+
+}
+
+void cuLayer::free_device_ptr() {
+
+  checkCudaErrors(cudaFree(dev_w));
+  checkCudaErrors(cudaFree(dev_b));
+  checkCudaErrors(cudaFree(dev_z));
+  checkCudaErrors(cudaFree(dev_a));
+
+}
+
+void cuLayer::feedThroughLayer(float *device_ptr_input, int len, int batchSize, cublasHandle_t cublasHandle, cudnnHandle_t cudnnHandle) {
+  assert(len == in);
+
+  float one = 1.0f, zero = 0.0f;
+
+  float *ones;
+  checkCudaErrors(cudaMalloc(&ones, batchSize * sizeof(float)));
+  checkCudaErrors(cudaMemset(ones, 1.0f, batchSize * sizeof(float)));
+
+  checkCudaErrors(cublasSgemm(cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N,
+                              out, batchSize, out,
+                              &one, dev_w, out, device_ptr_input, in,
+                              &zero, dev_z, out));
+
+  checkCudaErrors(cublasSgemm(cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N,
+                              out, batchSize, 1,
+                              &one, dev_b, out, ones, 1,
+                              &one, dev_z, out));
+
+  checkCUDNN(cudnnActivationForward(cudnnHandle, activation,
+                                    &one, zs, dev_z,
+                                    &zero, as, dev_a));
+}
 
 
 /*******************************************
@@ -159,111 +216,32 @@ cuFFNetwork::~cuFFNetwork() {
 Eigen::VectorXf cuFFNetwork::feedForward(float *data) {
   checkCudaErrors(cudaSetDevice(gpuid));
 
-  float one = 1.0f, zero = 0.0f;
+  hidden_layer.copy_to_device();
 
-  //need to copy all these vectors into the device - call cudaMemcpy, etc. for the shit to actually happen...
-  //use cudaMemcpyHostToDevice to copy everything in
+  output_layer.copy_to_device();
 
-  float *dev_hidden_w, *dev_hidden_b, *dev_hidden_z, *dev_hidden_a;
-
-  //malloc and copy over hidden layer parameters
-  checkCudaErrors(cudaMalloc(&dev_hidden_w, hidden_layer.in*hidden_layer.out * sizeof(float)));
-  checkCudaErrors(cudaMemcpy(dev_hidden_w, &hidden_layer.w.data()[0],
-                                  hidden_layer.in*hidden_layer.out * sizeof(float), cudaMemcpyHostToDevice));
-
-  checkCudaErrors(cudaMalloc(&dev_hidden_b, hidden_layer.out * sizeof(float)));
-  checkCudaErrors(cudaMemcpy(dev_hidden_b, &hidden_layer.b.data()[0],
-                                  hidden_layer.out * sizeof(float), cudaMemcpyHostToDevice));
-
-  checkCudaErrors(cudaMalloc(&dev_hidden_z, hidden_layer.out * sizeof(float)));
-  checkCudaErrors(cudaMemcpy(dev_hidden_z, &hidden_layer.z.data()[0],
-                                  hidden_layer.out * sizeof(float), cudaMemcpyHostToDevice));
-
-  checkCudaErrors(cudaMalloc(&dev_hidden_a, hidden_layer.out * sizeof(float)));
-  checkCudaErrors(cudaMemcpy(dev_hidden_a, &hidden_layer.a.data()[0],
-                                  hidden_layer.out * sizeof(float), cudaMemcpyHostToDevice));
-
-  float *dev_output_w, *dev_output_b, *dev_output_z, *dev_output_a;
-
-  //malloc and copy over output layer parameters
-  checkCudaErrors(cudaMalloc(&dev_output_w, output_layer.in*output_layer.out * sizeof(float)));
-  checkCudaErrors(cudaMemcpy(dev_output_w, &output_layer.w.data()[0],
-                                  output_layer.in*output_layer.out * sizeof(float), cudaMemcpyHostToDevice));
-
-  checkCudaErrors(cudaMalloc(&dev_output_b, output_layer.out * sizeof(float)));
-  checkCudaErrors(cudaMemcpy(dev_output_b, &output_layer.b.data()[0],
-                                  output_layer.out * sizeof(float), cudaMemcpyHostToDevice));
-
-  checkCudaErrors(cudaMalloc(&dev_output_z, output_layer.out * sizeof(float)));
-  checkCudaErrors(cudaMemcpy(dev_output_z, &output_layer.z.data()[0],
-                             output_layer.out * sizeof(float), cudaMemcpyHostToDevice));
-
-  checkCudaErrors(cudaMalloc(&dev_output_a, output_layer.out * sizeof(float)));
-  checkCudaErrors(cudaMemcpy(dev_output_a, &output_layer.a.data()[0],
-                             output_layer.out * sizeof(float), cudaMemcpyHostToDevice));
-
-
+  //Copy data to device to pass to the hidden layer
   float *dev_data;
   checkCudaErrors(cudaMalloc(&dev_data, hidden_layer.in * sizeof(float)));
   checkCudaErrors(cudaMemcpy(dev_data, &data[0], batchSize*hidden_layer.in * sizeof(float), cudaMemcpyHostToDevice));
 
+  //hidden layer - feed through
+  hidden_layer.feedThroughLayer(dev_data, hidden_layer.in, batchSize, cublasHandle, cudnnHandle);
 
-  float *ones;
-  checkCudaErrors(cudaMalloc(&ones, batchSize * sizeof(float)));
-  checkCudaErrors(cudaMemset(ones, 1.0f, batchSize * sizeof(float)));
-
-  //! CHECK COMPUTATIONS - NOT TOTALLY CONVINCED THEY'RE RIGHT - esp. cublas
-
-  //hidden layer
-
-  checkCudaErrors(cublasSgemm(cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N,
-                              hidden_layer.out, batchSize, hidden_layer.out,
-                              &one, dev_hidden_w, hidden_layer.out, dev_data, hidden_layer.in,
-                              &zero, dev_hidden_z, hidden_layer.out));
-
-  checkCudaErrors(cublasSgemm(cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N,
-                              hidden_layer.out, batchSize, 1,
-                              &one, dev_hidden_b, hidden_layer.out, ones, 1,
-                              &one, dev_hidden_z, hidden_layer.out));
-
-  checkCUDNN(cudnnActivationForward(cudnnHandle, hidden_layer.activation,
-                                    &one, hidden_layer.zs, dev_hidden_z,
-                                    &zero, hidden_layer.as, dev_hidden_a));
-
-  //output layer
-
-  checkCudaErrors(cublasSgemm(cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N,
-                              output_layer.out, batchSize, output_layer.in,
-                              &one, dev_output_w, output_layer.out, dev_hidden_a, output_layer.in,
-                              &zero, dev_output_z, output_layer.out));
-
-  checkCudaErrors(cublasSgemm(cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N,
-                              output_layer.out, batchSize, 1,
-                              &one, dev_output_b, output_layer.out, ones, 1,
-                              &one, dev_output_z, output_layer.out));
-
-  checkCUDNN(cudnnActivationForward(cudnnHandle, output_layer.activation,
-                                    &one, output_layer.zs, dev_output_z,
-                                    &zero, output_layer.as, dev_output_a));
+  //output layer - feed through
+  output_layer.feedThroughLayer(hidden_layer.dev_a, output_layer.in, batchSize, cublasHandle, cudnnHandle);
 
   //copy hidden data back to host
-  checkCudaErrors(cudaMemcpy(hidden_layer.z.data(), dev_hidden_z, hidden_layer.out*sizeof(float), cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(hidden_layer.a.data(), dev_hidden_a, hidden_layer.out*sizeof(float), cudaMemcpyDeviceToHost));
+  hidden_layer.copy_from_device();
+  //free device pointers
+  hidden_layer.free_device_ptr();
 
   //copy output data back to host
-  checkCudaErrors(cudaMemcpy(output_layer.z.data(), dev_output_z, output_layer.out*sizeof(float), cudaMemcpyDeviceToHost));
-  checkCudaErrors(cudaMemcpy(output_layer.a.data(), dev_output_a, output_layer.out*sizeof(float), cudaMemcpyDeviceToHost));
+  output_layer.copy_from_device();
+  //free device pointers
+  output_layer.free_device_ptr();
 
-  checkCudaErrors(cudaFree(ones));
   checkCudaErrors(cudaFree(dev_data));
-  checkCudaErrors(cudaFree(dev_hidden_w));
-  checkCudaErrors(cudaFree(dev_hidden_b));
-  checkCudaErrors(cudaFree(dev_hidden_z));
-  checkCudaErrors(cudaFree(dev_hidden_a));
-  checkCudaErrors(cudaFree(dev_output_w));
-  checkCudaErrors(cudaFree(dev_output_b));
-  checkCudaErrors(cudaFree(dev_output_z));
-  checkCudaErrors(cudaFree(dev_output_a));
 
   checkCudaErrors(cudaDeviceSynchronize());
 
