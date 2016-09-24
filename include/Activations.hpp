@@ -32,6 +32,10 @@
 #define SIGMA 1.
 #define MU 0.0
 
+inline double max(double one, double two){
+  return one > two ? one : two;
+}
+
 inline double Sigmoid(double input){
   return 1./(1. + exp(-input));
 }
@@ -54,6 +58,20 @@ inline double Tanh(double input){
 
 inline double TanhPrime(double input){
   return 1-pow(tanh(input), 2);
+}
+
+// NOT working for some reason
+inline double ReLU(double input){
+  return max(0.0, input);
+}
+
+inline double ReLUPrime(double input){
+  if (input > 0.0){
+    return 1.0;
+  }
+  else{
+    return 1e-3;
+  }
 }
 
 #endif //NEURALNETWORKS_ACTIVATIONS_HPP

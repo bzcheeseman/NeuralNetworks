@@ -69,4 +69,5 @@ inline double truncate(double in){
   }
 }
 
+
 #endif //NEURALNETWORKS_DROPOUTANDREGULARIZATION_HPP

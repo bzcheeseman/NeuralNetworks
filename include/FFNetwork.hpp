@@ -104,12 +104,13 @@ class FFNetwork {
   //! The cost function - returns a vector that corresponds to the cost per output neuron
   Eigen::VectorXd (*cost)(Eigen::VectorXd, Eigen::VectorXd);
   //! The derivative of the cost function - returns a vector that again corresponds to output neurons
-  Eigen::VectorXd (*costprime)(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd);
+  Eigen::VectorXd (*costprime)(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd, double (*)(double));
   //! Regularization function - Identity = L2, Sign = L1, Zero = None
   double (*regularization)(double);
   //! Dropout function - currenly only suppored in DropoutandRegularization.hpp with Bernoulli
   double (*dropout_fn)(double);
-
+  //! Truncation method
+  double (*truncate)(double);
   //! Chooses the backpropagation algorithm.
   enum {StochGradDescent, MOMSGD, ADADELTA}backprop;
 
@@ -149,8 +150,9 @@ public:
                     double (*phiprime)(double),
                     double (*regularization)(double),
                     double (*dropout_fn)(double),
+                    double (*truncation)(double),
                     Eigen::VectorXd (*cost)(Eigen::VectorXd, Eigen::VectorXd),
-                    Eigen::VectorXd (*costprime)(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd));
+                    Eigen::VectorXd (*costprime)(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd, double (*)(double)));
 
   /**
    * Sets backprop algorithm.  Uses strncmp to select the algorithm.

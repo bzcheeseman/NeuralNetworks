@@ -62,12 +62,14 @@ void FFNetwork::setFunctions(double (*phi)(double),
                              double (*phiprime)(double),
                              double (*regularization)(double),
                              double (*dropout_fn)(double),
+                             double (*truncation)(double),
                              VectorXd (*cost)(Eigen::VectorXd, Eigen::VectorXd),
-                             VectorXd (*costprime)(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd)) {
+                             VectorXd (*costprime)(Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd, double (*)(double))) {
   this->phi = phi;
   this->phiprime = phiprime;
   this->regularization = regularization;
   this->dropout_fn = dropout_fn;
+  this->truncate = truncation;
   this->cost = cost;
   this->costprime = costprime;
 }
@@ -102,7 +104,8 @@ Eigen::VectorXd FFNetwork::feedForward(Eigen::VectorXd input) {
 
 Eigen::VectorXi FFNetwork::operator()(Eigen::VectorXd input) {
   VectorXd net_out = this->feedForward(input);
-  net_out = net_out.unaryExpr(&truncate);
+
+  net_out = net_out.unaryExpr(truncate);
 
   return net_out.cast<int>();
 }
@@ -124,7 +127,7 @@ double FFNetwork::SGD(VectorXd input, VectorXd correct) {
   VectorXd net_result = this->feedForward(input);
   long num_layers = topology.size();
 
-  VectorXd delta = costprime(net_result, correct, layers[num_layers-1].z);
+  VectorXd delta = costprime(net_result, correct, layers[num_layers-1].z, phiprime);
 
   double out = abs(delta.norm());
 
@@ -166,7 +169,7 @@ double FFNetwork::MomentumSGD(Eigen::VectorXd input, Eigen::VectorXd correct) {
   VectorXd net_result = this->feedForward(input);
   long num_layers = topology.size();
 
-  VectorXd delta = costprime(net_result, correct, layers[num_layers-1].z);
+  VectorXd delta = costprime(net_result, correct, layers[num_layers-1].z, phiprime);
 
   double out = abs(delta.norm());
 
@@ -212,16 +215,16 @@ double FFNetwork::Adadelta(Eigen::VectorXd input, Eigen::VectorXd correct) {
   VectorXd net_result = this->feedForward(input);
   long num_layers = this->topology.size();
 
-  VectorXd delta = this->costprime(net_result, correct, layers[num_layers-1].z);
+  VectorXd delta = this->costprime(net_result, correct, layers[num_layers-1].z, phiprime);
 
   double out = abs(delta.norm());
 
-  static double msW = 1.*delta.squaredNorm();
-  static double msD = 1.*delta.squaredNorm();
+  static double msW = (1.+gamma);
+  static double msD = (1.-gamma);
 
   static MatrixXd gradient;
 
-  static double lr = sqrt(msD + epsilon)/sqrt(msW + epsilon);;
+  static double lr = sqrt(msD + epsilon)/sqrt(msW + epsilon);
 
   layers[num_layers-1].b -= lr * delta;
   layers[num_layers-1].w -= lr * (delta * (layers[num_layers-2].a).transpose());
@@ -314,6 +317,9 @@ void FFNetwork::Train(dataSet<double> *training, dataSet<double> *validation, do
   }
   else if (abort_gradient_reached){
     std::cout << "Finished training in " << epochs << " epochs, gradient < MIN_GRADIENT = " << min_gradient << std::endl;
+  }
+  else{
+    std::cout << "max_epochs reached" << std::endl;
   }
 
   std::string algorithm;

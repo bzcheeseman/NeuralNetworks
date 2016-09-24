@@ -32,8 +32,9 @@ inline Eigen::VectorXd QuadCost(Eigen::VectorXd out, Eigen::VectorXd correct){
   return 0.5 * (out - correct).array().pow(2);
 }
 
-inline Eigen::VectorXd QuadCostPrime(Eigen::VectorXd out, Eigen::VectorXd correct, Eigen::VectorXd last_zs){
-  return (out - correct).cwiseProduct(last_zs.unaryExpr(&SigmoidPrime));
+inline Eigen::VectorXd QuadCostPrime(Eigen::VectorXd out, Eigen::VectorXd correct,
+                                     Eigen::VectorXd last_zs, double (*activationPrime)(double)){
+  return (out - correct).cwiseProduct(last_zs.unaryExpr(activationPrime));
 }
 
 inline Eigen::VectorXd CrossEntropyCost(Eigen::VectorXd out, Eigen::VectorXd correct){
@@ -44,7 +45,8 @@ inline Eigen::VectorXd CrossEntropyCost(Eigen::VectorXd out, Eigen::VectorXd cor
   return output;
 }
 
-inline Eigen::VectorXd CrossEntropyPrime(Eigen::VectorXd out, Eigen::VectorXd correct, Eigen::VectorXd last_zs){
+inline Eigen::VectorXd CrossEntropyPrime(Eigen::VectorXd out, Eigen::VectorXd correct,
+                                         Eigen::VectorXd last_zs, double (*activationPrime)(double)){
   return out-correct;
 }
 
