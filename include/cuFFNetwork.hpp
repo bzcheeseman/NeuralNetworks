@@ -87,6 +87,8 @@ struct cuFFLayer{
 
   int in, out;
 
+  int batchSize;
+
   /*
    * n = batchSize
    * c = number of outputs from that tensor (feature maps ~ map input into output) - properly only need one
@@ -108,12 +110,21 @@ struct cuFFLayer{
   Eigen::VectorXf a;
   float *dev_a;
 
+  //this is the gradient w.r.t. the previous layer (!)
+  cudnnTensorDescriptor_t gradientTensor;
+  Eigen::MatrixXf gradient;
+  float *dev_gradient;
+  Eigen::MatrixXf dw;
+  float *dCdw;
+  Eigen::VectorXf db;
+  float *dCdb;
+
   cudnnTensorDescriptor_t layerTensor; //apply activation within the layer which apparently works well.
 
-  cuFFLayer(int in, int out, int gpuid);
+  cuFFLayer(int in, int out, int gpuid, int batchSize);
   ~cuFFLayer();
 
-  void initTensor(int batchSize);
+  void initTensor();
 
   void setActivation(cudnnActivationMode_t cudnnActivationFunc);
 
@@ -129,7 +140,11 @@ struct cuFFLayer{
   //! and nothing explodes...)
   //! Also turns out cublas is column-major too so I'm good - just check that cudnn is too - thougth it might not matter either
   //! might not matter though - as long as it happens the same way every time maybe it just doesn't matter?
-  void feedThroughLayer(float *device_ptr_input, int len, int batchSize, cublasHandle_t cublasHandle, cudnnHandle_t cudnnHandle);
+  void feedThroughLayer(float *device_ptr_input, int len, cublasHandle_t cublasHandle, cudnnHandle_t cudnnHandle);
+
+  void init_gradient();
+
+  void copy_back_gradient();
 
   friend std::ostream &operator<<(std::ostream &out, cuFFLayer &layer);
 

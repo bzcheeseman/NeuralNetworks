@@ -28,13 +28,13 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-//! These DO NOT WORK for some reason
+/*
+ * Gotta be careful how you init - make sure however many threads run this in parallel will get this too (do the roundUp thing)
+ */
 
 __global__ void fillOnes(float *vec, int size);
 
 __global__ void fillZeros(float *vec, int size);
 
-
-//! let's hope this works
 __global__ void costFunc(float *vec, int size, int batchSize, float *diff);
 #endif //NEURALNETWORKS_CUDAKERNELS_HPP

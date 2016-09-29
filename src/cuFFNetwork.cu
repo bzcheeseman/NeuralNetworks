@@ -34,11 +34,14 @@ static inline unsigned int RoundUp(unsigned int numerator, unsigned int denomina
  * cuLayer
  *******************************************/
 
-cuFFLayer::cuFFLayer(int in, int out, int gpuid) : in(in), out(out), gpuid(gpuid) {
+cuFFLayer::cuFFLayer(int in, int out, int gpuid, int batchSize) : in(in), out(out), gpuid(gpuid), batchSize(batchSize) {
   w = Eigen::MatrixXf(out, in);
   b = Eigen::VectorXf(out);
   z = Eigen::VectorXf(out);
   a = Eigen::VectorXf(out);
+  gradient = Eigen::MatrixXf(out, batchSize);
+  dw = Eigen::MatrixXf(out, in);
+  db = Eigen::VectorXf(out);
 
   checkCudaErrors(cudaSetDevice(gpuid));
 
@@ -88,7 +91,7 @@ cuFFLayer::~cuFFLayer() {
   checkCUDNN(cudnnDestroyActivationDescriptor(activation));
 }
 
-void cuFFLayer::initTensor(int batchSize) {
+void cuFFLayer::initTensor() {
 
   checkCudaErrors(cudaSetDevice(gpuid));
 
@@ -143,9 +146,13 @@ void cuFFLayer::free_device_ptr() {
   checkCudaErrors(cudaFree(dev_z));
   checkCudaErrors(cudaFree(dev_a));
 
+//  checkCudaErrors(cudaFree(dev_gradient));
+//  checkCudaErrors(cudaFree(dCdw));
+//  checkCudaErrors(cudaFree(dCdb));
+
 }
 
-void cuFFLayer::feedThroughLayer(float *device_ptr_input, int len, int batchSize, cublasHandle_t cublasHandle, cudnnHandle_t cudnnHandle) {
+void cuFFLayer::feedThroughLayer(float *device_ptr_input, int len, cublasHandle_t cublasHandle, cudnnHandle_t cudnnHandle) {
   assert(len == in);
 
   checkCudaErrors(cudaSetDevice(gpuid));
@@ -169,6 +176,36 @@ void cuFFLayer::feedThroughLayer(float *device_ptr_input, int len, int batchSize
   checkCUDNN(cudnnActivationForward(cudnnHandle, activation,
                                     &one, layerTensor, dev_z,
                                     &zero, layerTensor, dev_a)); //apply activation within the layer, before giving away output
+}
+
+void cuFFLayer::init_gradient() {
+
+  checkCudaErrors(cudaSetDevice(gpuid));
+
+  //init gradient tensor
+  checkCUDNN(cudnnCreateTensorDescriptor(&(gradientTensor))); // init tensor for this layer
+  checkCUDNN(cudnnSetTensor4dDescriptor(gradientTensor, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, batchSize, out, 1, 1));
+
+  //now copy over the array to the device
+  checkCudaErrors(cudaMalloc(&dev_gradient, out*batchSize*sizeof(float)));
+  checkCudaErrors(cudaMemcpyAsync(dev_gradient, gradient.data(), out*batchSize*sizeof(float), cudaMemcpyHostToDevice));
+
+  checkCudaErrors(cudaMalloc(&dCdw, in*out*sizeof(float)));
+  checkCudaErrors(cudaMemset(dCdw, 0.0f, in*out*sizeof(float)));
+
+  checkCudaErrors(cudaMalloc(&dCdb, out*sizeof(float)));
+  checkCudaErrors(cudaMemset(dCdb, 0.0f, out*sizeof(float)));
+
+}
+
+void cuFFLayer::copy_back_gradient() {
+
+  checkCudaErrors(cudaSetDevice(gpuid));
+
+  checkCudaErrors(cudaMemcpy(gradient.data(), dev_gradient, out*batchSize*sizeof(float), cudaMemcpyDeviceToHost));
+  checkCudaErrors(cudaMemcpy(dw.data(), dCdw, in*out*sizeof(float), cudaMemcpyDeviceToHost));
+  checkCudaErrors(cudaMemcpy(db.data(), dCdb, out*sizeof(float), cudaMemcpyDeviceToHost));
+
 }
 
 std::ostream &operator<<(std::ostream &out, cuFFLayer &layer) {
@@ -198,9 +235,9 @@ cuFFNetwork::cuFFNetwork(int gpuid, int batchSize, cuFFLayer& hidden_layer, cuFF
 
   checkCUDNN(cudnnCreateTensorDescriptor(&input_data)); // init tensor for input data
 
-  this->hidden_layer.initTensor(batchSize);
+  this->hidden_layer.initTensor();
 
-  this->output_layer.initTensor(batchSize);
+  this->output_layer.initTensor();
 
   if (activation_func == ReLU){
     this->hidden_layer.setActivation(CUDNN_ACTIVATION_RELU);
@@ -237,14 +274,14 @@ Eigen::VectorXf cuFFNetwork::feedForward(float *data) {
 
   //Copy data to device to pass to the hidden layer
   float *dev_data;
-  checkCudaErrors(cudaMalloc(&dev_data, hidden_layer.in * sizeof(float)));
+  checkCudaErrors(cudaMalloc(&dev_data, batchSize * hidden_layer.in * sizeof(float)));
   checkCudaErrors(cudaMemcpy(dev_data, &data[0], batchSize*hidden_layer.in * sizeof(float), cudaMemcpyHostToDevice));
 
   //hidden layer - feed through
-  hidden_layer.feedThroughLayer(dev_data, hidden_layer.in, batchSize, cublasHandle, cudnnHandle);
+  hidden_layer.feedThroughLayer(dev_data, hidden_layer.in, cublasHandle, cudnnHandle);
 
   //output layer - feed through
-  output_layer.feedThroughLayer(hidden_layer.dev_a, output_layer.in, batchSize, cublasHandle, cudnnHandle);
+  output_layer.feedThroughLayer(hidden_layer.dev_a, output_layer.in, cublasHandle, cudnnHandle);
 
   //copy hidden data back to host
   hidden_layer.copy_from_device();
@@ -267,28 +304,71 @@ double cuFFNetwork::backPropagate(float *correct_out) {
 
   checkCudaErrors(cudaSetDevice(gpuid));
   float one = 1.0f, zero = 0.0f;
+  float eta = 0.1f;
+
+  float *ones;
+  checkCudaErrors(cudaMalloc(&ones, batchSize * sizeof(float)));
+  checkCudaErrors(cudaMemset(ones, 1.0f, batchSize * sizeof(float)));
 
   hidden_layer.copy_to_device();
   output_layer.copy_to_device();
 
   float *dev_loss;
-  checkCudaErrors(cudaMalloc(&dev_loss, output_layer.out * sizeof(float)));
-  checkCudaErrors(cudaMemcpyAsync(dev_loss, output_layer.dev_a, output_layer.out * sizeof(float), cudaMemcpyDeviceToDevice));
+  checkCudaErrors(cudaMalloc(&dev_loss, batchSize * output_layer.out * sizeof(float)));
+  checkCudaErrors(cudaMemcpyAsync(dev_loss, output_layer.dev_a, batchSize * output_layer.out * sizeof(float), cudaMemcpyDeviceToDevice));
 
   float *dev_correct;
   checkCudaErrors(cudaMalloc(&dev_correct, output_layer.out * sizeof(float)));
   checkCudaErrors(cudaMemcpyAsync(dev_correct, correct_out, output_layer.out * sizeof(float), cudaMemcpyHostToDevice));
 
+
+  output_layer.init_gradient();
+  hidden_layer.init_gradient();
+
   //compute error at the last layer - need to update this probably
   costFunc<<<RoundUp(batchSize, BW),BW>>>(dev_loss, output_layer.out, batchSize, dev_correct);
 
-  //think about activationBackward function call carefully - it's gotta be simple-ish
-//  checkCUDNN(cudnnActivationBackward(cudnnHandle, output_layer.activation,
-//                                     &one, output_layer.layerTensor, output_layer.dev_a, output_layer.layerTensor, dev_loss, ))
+  checkCUDNN(cudnnActivationBackward(cudnnHandle, output_layer.activation,
+                                     &one, output_layer.layerTensor, output_layer.dev_a, output_layer.layerTensor,
+                                     dev_loss, output_layer.layerTensor, output_layer.dev_z,
+                                     &zero, output_layer.gradientTensor, output_layer.dev_gradient));
 
-  Eigen::VectorXf readin (output_layer.out);
-  checkCudaErrors(cudaMemcpyAsync(readin.data(), dev_loss, output_layer.out * sizeof(float), cudaMemcpyDeviceToHost));
 
-  std::cout << readin << std::endl;
+  checkCudaErrors(cublasSgemm(cublasHandle, CUBLAS_OP_N, CUBLAS_OP_T, output_layer.in, output_layer.out, batchSize,
+                              &one, hidden_layer.dev_a, output_layer.in, output_layer.dev_gradient, output_layer.out,
+                              &zero, output_layer.dCdw, output_layer.out));
 
+  //not working for some reason - right here this gives zeros when it shouldn't.
+  checkCudaErrors(cublasSgemv(cublasHandle, CUBLAS_OP_N, output_layer.out, batchSize,
+                               &one, output_layer.dev_gradient, output_layer.out, ones, 1,
+                               &zero, output_layer.dCdb, 1));
+
+  checkCUDNN(cudnnActivationBackward(cudnnHandle, hidden_layer.activation,
+                                     &one, hidden_layer.layerTensor, hidden_layer.dev_a, hidden_layer.layerTensor, ))
+
+  //for now just update output layer
+
+  //bias
+  checkCudaErrors(cublasSaxpy(cublasHandle, output_layer.out, &eta, output_layer.dCdb, 1, output_layer.dev_b, 1));
+
+  //weights
+  checkCudaErrors(cublasSgeam(cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, output_layer.out, output_layer.in,
+                              &eta, output_layer.dCdw, output_layer.out,
+                              &eta, output_layer.dev_w, output_layer.out,
+                              output_layer.dev_w, output_layer.out));
+
+  output_layer.copy_back_gradient();
+  std::cout << output_layer.gradient << std::endl << std::endl;
+  std::cout << output_layer.dw << std::endl << std::endl;
+  std::cout << output_layer.w << std::endl << std::endl;
+  std::cout << output_layer.db << std::endl << std::endl;
+  std::cout << output_layer.b << std::endl << std::endl;
+
+  output_layer.copy_from_device();
+  output_layer.free_device_ptr();
+
+//  Eigen::VectorXf readin (output_layer.out);
+//  checkCudaErrors(cudaMemcpyAsync(readin.data(), dev_loss, output_layer.out * sizeof(float), cudaMemcpyDeviceToHost));
+
+  return 1.0;
 }
