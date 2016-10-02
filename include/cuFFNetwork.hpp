@@ -39,11 +39,14 @@
 #include <cublas_v2.h>
 #include <cudnn.h>
 #include <curand.h>
+#include <thrust/device_vector.h>
+#include <thrust/device_ptr.h>
 
 #include "cudaKernels.hpp"
 
 /*
- * Alright, time for a CUDNN implementation of what I have already!
+ * TODO: Change all float* to thrust vectors...
+ * TODO: Clean up and apply it to the iris dataset!
  */
 
 #define BW 128
@@ -111,9 +114,9 @@ struct cuFFLayer{
   float *dev_a;
 
   //this is the gradient w.r.t. the previous layer (!)
-  cudnnTensorDescriptor_t gradientTensor;
-  Eigen::MatrixXf gradient;
-  float *dev_gradient;
+  cudnnTensorDescriptor_t deltaTensor;
+  Eigen::MatrixXf delta;
+  float *dev_delta;
   Eigen::MatrixXf dw;
   float *dCdw;
   Eigen::VectorXf db;
@@ -140,7 +143,7 @@ struct cuFFLayer{
   //! and nothing explodes...)
   //! Also turns out cublas is column-major too so I'm good - just check that cudnn is too - thougth it might not matter either
   //! might not matter though - as long as it happens the same way every time maybe it just doesn't matter?
-  void feedThroughLayer(float *device_ptr_input, int len, cublasHandle_t cublasHandle, cudnnHandle_t cudnnHandle);
+  void feedThroughLayer(float *device_ptr_input, cublasHandle_t cublasHandle, cudnnHandle_t cudnnHandle);
 
   void init_gradient();
 
@@ -171,7 +174,7 @@ public:
 
   Eigen::VectorXf feedForward(float *data);
 
-  double backPropagate(float *correct_out);
+  double backPropagate(float *inputs, float *correct_out, int iterations);
 
 };
 

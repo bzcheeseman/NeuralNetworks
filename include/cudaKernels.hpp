@@ -37,4 +37,6 @@ __global__ void fillOnes(float *vec, int size);
 __global__ void fillZeros(float *vec, int size);
 
 __global__ void costFunc(float *vec, int size, int batchSize, float *diff);
+
+__global__ void copyVec(float *vec, float *other, int size);
 #endif //NEURALNETWORKS_CUDAKERNELS_HPP
