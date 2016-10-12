@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.6)
 project(NeuralNetworks)
 
+# Gotta un-hide the 7.3.1 developer tools - mv /Library/Developer/CommandLineTools7.3 /Library/Developer/CommandLineTools
+# and then mv /Library/Developer/CommandLineTools /Library/Developer/CommandLineTools7.3 when done
+
 find_package(Doxygen)
 
 if(DOXYGEN_FOUND)
@@ -13,13 +16,14 @@ if(DOXYGEN_FOUND)
             )
 endif(DOXYGEN_FOUND)
 
-find_package(CUDA 7.5 REQUIRED)
+find_package(CUDA 8.0 REQUIRED)
 
 #debug
 #-gencode;arch=compute_35,code=sm_35;-gencode;arch=compute_52,code=compute_52;-gencode;arch=compute_50,code=compute_50;
 
 #non-debug
 #-gencode;arch=compute_35,code=sm_35;-gencode;arch=compute_52,code=sm_52;-gencode;arch=compute_50,code=compute_50;
+
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     message("Debug mode")
@@ -34,8 +38,7 @@ include_directories(/usr/local/cuda/include /usr/local/cuda)
 link_directories(/usr/local/cuda/lib)
 link_directories(/usr/local/lib /usr/lib)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -fopenmp")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 find_package(eigen3 REQUIRED)
 include_directories(/usr/local/include/eigen3)

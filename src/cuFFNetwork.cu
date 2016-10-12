@@ -327,6 +327,12 @@ double cuFFNetwork::backPropagate(float *inputs, float *correct_out, int iterati
   checkCudaErrors(cudaMalloc(&dev_inputs, batchSize * hidden_layer.in * sizeof(float)));
   checkCudaErrors(cudaMemcpyAsync(dev_inputs, &(inputs[0]), batchSize * hidden_layer.in * sizeof(float), cudaMemcpyHostToDevice));
 
+  thrust::device_vector<float> input_activations(batchSize*hidden_layer.in, 0.0f);
+
+  checkCUDNN(cudnnActivationForward(cudnnHandle, hidden_layer.activation,
+                                    &one, hidden_layer.layerTensor, dev_inputs,
+                                    &zero, hidden_layer.layerTensor, thrust::raw_pointer_cast(&input_activations[0])));
+
   float *dev_correct;
   checkCudaErrors(cudaMalloc(&dev_correct, batchSize * output_layer.out * sizeof(float)));
   checkCudaErrors(cudaMemcpyAsync(dev_correct, &(correct_out[0]), batchSize * output_layer.out * sizeof(float), cudaMemcpyHostToDevice));
@@ -360,15 +366,6 @@ double cuFFNetwork::backPropagate(float *inputs, float *correct_out, int iterati
                                 &one, output_layer.dev_delta, output_layer.out, hidden_layer.dev_a, hidden_layer.out,
                                 &zero, output_layer.dCdw, output_layer.out));
 
-    //update output layer
-    checkCudaErrors(cublasSaxpy(cublasHandle, output_layer.out,
-                                &eta, output_layer.dCdb, 1, output_layer.dev_b, 1));
-
-    checkCudaErrors(cublasSgeam(cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, output_layer.out, output_layer.in,
-                                &eta, output_layer.dCdw, output_layer.out,
-                                &one, output_layer.dev_w, output_layer.out,
-                                output_layer.dev_w, output_layer.out));
-
     checkCudaErrors(cudaFree(dev_cost));
     checkCudaErrors(cudaMalloc(&dev_cost, hidden_layer.out * batchSize * sizeof(float)));
 
@@ -394,6 +391,14 @@ double cuFFNetwork::backPropagate(float *inputs, float *correct_out, int iterati
                                 &one, hidden_layer.dev_delta, hidden_layer.out, dev_inputs, hidden_layer.in,
                                 &zero, hidden_layer.dCdw, hidden_layer.out));
 
+    //update output layer
+    checkCudaErrors(cublasSaxpy(cublasHandle, output_layer.out,
+                                &eta, output_layer.dCdb, 1, output_layer.dev_b, 1));
+
+    checkCudaErrors(cublasSgeam(cublasHandle, CUBLAS_OP_N, CUBLAS_OP_N, output_layer.out, output_layer.in,
+                                &eta, output_layer.dCdw, output_layer.out,
+                                &one, output_layer.dev_w, output_layer.out,
+                                output_layer.dev_w, output_layer.out));
 
     //update hidden layer
     checkCudaErrors(cublasSaxpy(cublasHandle, hidden_layer.out,

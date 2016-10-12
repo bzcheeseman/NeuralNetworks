@@ -30,7 +30,7 @@ int main(int argc, char *argv[]){
 
   int num_inputs = 4, num_hidden = 4, num_outputs = 3;
 
-  int batchSize = 1;
+  int batchSize = 1; //batchSize = 1 works best...also online learning which is cool/useful
 
   cuFFLayer hiddens(num_inputs, num_hidden, 0, batchSize);
   cuFFLayer outputs(num_hidden, num_outputs, 0, batchSize);
@@ -42,8 +42,8 @@ int main(int argc, char *argv[]){
 
 //  std::cout << outputs << std::endl;
 
-//  float data[8] = {fakein[0], fakein[1], fakein[2], fakein[3], fakein2[0], fakein2[1], fakein2[2], fakein2[3]};
-//  float dataout[6] = {fakeout[0], fakeout[1], fakeout[2], fakeout2[0], fakeout2[1], fakeout2[2]};
+  float data[8] = {fakein[0], fakein[1], fakein[2], fakein[3], fakein2[0], fakein2[1], fakein2[2], fakein2[3]};
+  float dataout[6] = {fakeout[0], fakeout[1], fakeout[2], fakeout2[0], fakeout2[1], fakeout2[2]};
 
   cuFFNetwork net (0, batchSize, hiddens, outputs);
 //  net.feedForward(data);
@@ -51,9 +51,9 @@ int main(int argc, char *argv[]){
 
 //  std::cout << outputs << std::endl;
 
-  net.backPropagate(fakein2, fakeout2, 10000);
+  net.backPropagate(fakein, fakeout, 10000);
 
-  std::cout << net.feedForward(fakein2) << std::endl;
+  std::cout << net.feedForward(fakein) << std::endl;
 
 //  std::cout << outputs << std::endl;
 
