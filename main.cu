@@ -22,7 +22,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "include/cuFFNetwork.hpp"
+//#include "include/cuFFNetwork.hpp"
+#include "include_v2/Layer.hpp"
 
 int main(int argc, char *argv[]){
 
@@ -57,7 +58,11 @@ int main(int argc, char *argv[]){
 
 //  std::cout << outputs << std::endl;
 
+  float fakein[4] = {1.2f, 1.1f, 1.3f, 0.2f};
 
+  Tensor datain (fakein, 1, 4, 1, 1, 0);
+  FFLayer testLayer(4, 3, 0, 1);
+  testLayer.feedThroughLayer(datain);
 
 
   return 0;

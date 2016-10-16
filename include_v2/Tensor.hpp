@@ -48,14 +48,14 @@
  * w = width of feature maps = 1 for fully connected layer (nodes don't depend on each other)
  *
  */
-template<int N, int C, int H = 1, int W = 1>
 struct Tensor {
 
-  cudnnTensorDescriptor_t cudnnDesc; //this will have to be changed by each layer it passes through
+  cudnnTensorDescriptor_t TensorDesc; //this will have to be changed by each layer it passes through
   unsigned gpuid; //Identifies the gpu we're working on.
+  int N, C, H, W;
 
 
-  Eigen::Matrix<float, N, C> cpu_data;
+  Eigen::MatrixXf cpu_data;
   thrust::device_vector<float> device_data;
   float *raw_device_data; //raw pointer cast for &device_data[0] <- maintain this status!
 
@@ -66,12 +66,15 @@ struct Tensor {
    * @param gpuid The gpu we're using - defaults to 0.
    * @return An empty Tensor object.
    */
-  Tensor(unsigned gpuid = 0): gpuid(gpuid) {
+  Tensor(int N, int C, int H, int W, unsigned gpuid = 0): gpuid(gpuid), N(N), C(C), H(H), W(W) {
+
+    cpu_data = Eigen::MatrixXf(N, C);
+
     checkCudaErrors(cudaSetDevice(gpuid));
 
-    checkCUDNN(cudnnCreateTensorDescriptor(&cudnnDesc)); // init tensor for this layer
+    checkCUDNN(cudnnCreateTensorDescriptor(&TensorDesc)); // init tensor for this layer
 
-    checkCUDNN(cudnnSetTensor4dDescriptor(cudnnDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, N, C, H, W));
+    checkCUDNN(cudnnSetTensor4dDescriptor(TensorDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, N, C, H, W));
   }
 
   /**
@@ -81,15 +84,18 @@ struct Tensor {
    * @param gpuid
    * @return A Tensor object filled with data specified by @param data
    */
-  Tensor(float *data, unsigned gpuid = 0): gpuid(gpuid) {
+  Tensor(float *data, int N, int C, int H, int W, unsigned gpuid = 0): gpuid(gpuid), N(N), C(C), H(H), W(W) {
+
+    cpu_data = Eigen::MatrixXf(N, C);
+
     checkCudaErrors(cudaSetDevice(gpuid));
 
-    checkCUDNN(cudnnCreateTensorDescriptor(&cudnnDesc)); // init tensor for this layer
+    checkCUDNN(cudnnCreateTensorDescriptor(&TensorDesc)); // init tensor for this layer
 
-    checkCUDNN(cudnnSetTensor4dDescriptor(cudnnDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, N, C, H, W));
+    checkCUDNN(cudnnSetTensor4dDescriptor(TensorDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, N, C, H, W));
 
-    cpu_data = Eigen::Map< Eigen::Matrix<float, N, C> >(data); //init cpu_data
-    device_data(data, data + N*C); //init device_data;
+    std::copy_n(data, N*C, cpu_data.data()); //init cpu_data
+    device_data = thrust::device_vector<float>(data, data + N*C); //init device_data;
     raw_device_data = thrust::raw_pointer_cast(&device_data[0]); //init the raw pointer to hand off to cublas/cudnn routines
   }
 
@@ -98,8 +104,8 @@ struct Tensor {
    * @param data What to fill the tensor with
    */
   void setData(float *data){
-    cpu_data = Eigen::Map< Eigen::Matrix<float, N, C> >(data); //init cpu_data
-    device_data(data, data + N*C); //init device_data;
+    std::copy_n(data, N*C, cpu_data.data()); //init cpu_data
+    device_data = thrust::device_vector<float>(&data[0], &data[0] + N*C); //init device_data;
     raw_device_data = thrust::raw_pointer_cast(&device_data[0]); //init the raw pointer to hand off to cublas/cudnn routines
   }
 
