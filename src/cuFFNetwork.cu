@@ -348,7 +348,7 @@ double cuFFNetwork::backPropagate(float *inputs, float *correct_out, int iterati
 
     checkCudaErrors(cublasScopy(cublasHandle, batchSize * output_layer.out, output_layer.dev_a, 1, dev_cost, 1));
 
-    costFunc<<<RoundUp(batchSize, BW), BW>>>(dev_cost, output_layer.out, batchSize, dev_correct);
+    costFunc<<<RoundUp(batchSize, BW), BW>>>(dev_cost, output_layer.out, batchSize, dev_correct); //costfunc
 
     checkCUDNN(cudnnActivationBackward(cudnnHandle, output_layer.activation,
                                        &one, output_layer.layerTensor, output_layer.dev_a,

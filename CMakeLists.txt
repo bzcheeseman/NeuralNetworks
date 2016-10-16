@@ -54,10 +54,16 @@ set(SOURCE_FILES
 #        include/Activations.hpp
 #        include/CostFunctions.hpp
 #        include/DropoutandRegularization.hpp
-        src/cuFFNetwork.cu
-        include/cuFFNetwork.hpp
-        src/cudaKernels.cu
-        include/cudaKernels.hpp
+#        src/cuFFNetwork.cu
+#        include/cuFFNetwork.hpp
+#        src/cudaKernels.cu
+#        include/cudaKernels.hpp
+        src_v2/Layer.cu
+        src_v2/Network.cu
+        include_v2/Layer.hpp
+        include_v2/Network.hpp
+        include_v2/Tensor.hpp
+        include_v2/utility.hpp
         main.cu
 )
 

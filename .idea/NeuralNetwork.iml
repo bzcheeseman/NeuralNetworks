@@ -2,12 +2,14 @@
 <module type="CPP_MODULE" version="4">
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
-      <sourceFolder url="file://$MODULE_DIR$/include/cudaKernels.hpp" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/include/cuFFNetwork.hpp" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/src/cudaKernels.cu" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/src/cuFFNetwork.cu" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src_v2/Network.cu" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/src_v2/Layer.cu" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/CMakeLists.txt" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/docs/Doxyfile" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/include_v2/utility.hpp" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/include_v2/Layer.hpp" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/include_v2/Tensor.hpp" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/include_v2/Network.hpp" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/main.cu" isTestSource="false" />
     </content>
     <orderEntry type="sourceFolder" forTests="false" />

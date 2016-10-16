@@ -47,6 +47,7 @@
 /*
  * TODO: Change all float* to thrust vectors...
  * TODO: Clean up and apply it to the iris dataset!
+ * TODO: Thrust matrix and vector class - stores cpu values in Eigen matrices?
  */
 
 #define BW 128
