@@ -24,6 +24,7 @@
 
 //#include "include/cuFFNetwork.hpp"
 #include "include_v2/Layer.hpp"
+#include <iostream>
 
 int main(int argc, char *argv[]){
 
@@ -62,7 +63,9 @@ int main(int argc, char *argv[]){
 
   Tensor datain (fakein, 1, 4, 1, 1, 0);
   FFLayer testLayer(4, 3, 0, 1);
-  testLayer.feedThroughLayer(datain);
+  auto out = testLayer.feedThroughLayer(datain);
+  out.copy_back();
+  std::cout << out.cpu_data << std::endl;
 
 
   return 0;

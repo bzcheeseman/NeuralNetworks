@@ -44,14 +44,6 @@
 class Layer {
 
 public:
-  unsigned gpuid;
-  cudnnHandle_t cudnnHandle;
-  cublasHandle_t cublasHandle;
-  cudnnActivationDescriptor_t layerActivation;
-  int inputs;
-  int outputs;
-  int batchSize;
-
   thrust::device_vector<float> ones; //size = batchSize
   float *raw_ones;
 
@@ -169,12 +161,15 @@ public:
     device_z = thrust::device_vector<float>(outputs*batchSize);
     raw_device_z = thrust::raw_pointer_cast(&(device_z[0]));
 
+    cpu_a = Eigen::MatrixXf(outputs, batchSize);
+    device_a = thrust::device_vector<float>(outputs*batchSize);
+    raw_device_a = thrust::raw_pointer_cast(&(device_a[0]));
+
     checkCudaErrors(cudaSetDevice(gpuid));
 
     checkCUDNN(cudnnCreateActivationDescriptor(&(layerActivation)));
     checkCUDNN(cudnnSetActivationDescriptor(layerActivation, CUDNN_ACTIVATION_SIGMOID, CUDNN_PROPAGATE_NAN, 0.0));
 
-    float *devicedata;
     float mean = (float)0.0;
     float stddev = (float)(1.0 /sqrt( (float)in ));
 
@@ -224,7 +219,7 @@ public:
                                       &one, out.TensorDesc, raw_device_z,
                                       &zero, out.TensorDesc, raw_device_a)); //apply activation within the layer
 
-    out.setData(raw_device_a);
+    out.setDeviceData(raw_device_a);
 
     return out;
   }
@@ -256,6 +251,8 @@ public:
    * @param prev The layer closer to the input end of the NN
    */
   void backThroughLayer(Tensor &backward){
+
+    initBackprop();
 
     checkCudaErrors(cudaSetDevice(gpuid));
 
