@@ -60,6 +60,7 @@ set(SOURCE_FILES
 #        include/cudaKernels.hpp
         src_v2/Layer.cu
         src_v2/Network.cu
+        src_v2/Tensor.cu
         include_v2/Layer.hpp
         include_v2/Network.hpp
         include_v2/Tensor.hpp

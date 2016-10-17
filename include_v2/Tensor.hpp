@@ -66,16 +66,7 @@ struct Tensor {
    * @param gpuid The gpu we're using - defaults to 0.
    * @return An empty Tensor object.
    */
-  Tensor(int N, int C, int H, int W, unsigned gpuid = 0): gpuid(gpuid), N(N), C(C), H(H), W(W) {
-
-    cpu_data = Eigen::MatrixXf::Zero(N, C);
-
-    checkCudaErrors(cudaSetDevice(gpuid));
-
-    checkCUDNN(cudnnCreateTensorDescriptor(&TensorDesc)); // init tensor for this layer
-
-    checkCUDNN(cudnnSetTensor4dDescriptor(TensorDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, N, C, H, W));
-  }
+  Tensor(int N, int C, int H, int W, unsigned gpuid = 0);
 
   /**
    *
@@ -84,47 +75,27 @@ struct Tensor {
    * @param gpuid
    * @return A Tensor object filled with data specified by @param data
    */
-  Tensor(float *data, int N, int C, int H, int W, unsigned gpuid = 0): gpuid(gpuid), N(N), C(C), H(H), W(W) {
-
-    cpu_data = Eigen::MatrixXf(N, C);
-
-    checkCudaErrors(cudaSetDevice(gpuid));
-
-    checkCUDNN(cudnnCreateTensorDescriptor(&TensorDesc)); // init tensor for this layer
-
-    checkCUDNN(cudnnSetTensor4dDescriptor(TensorDesc, CUDNN_TENSOR_NCHW, CUDNN_DATA_FLOAT, N, C, H, W));
-
-    cpu_data = Eigen::Map<Eigen::MatrixXf>(data, N, C); //init cpu_data
-    device_data = thrust::device_vector<float>(data, data + N*C); //init device_data;
-    raw_device_data = thrust::raw_pointer_cast(&device_data[0]); //init the raw pointer to hand off to cublas/cudnn routines
-  }
+  Tensor(float *data, int N, int C, int H, int W, unsigned gpuid = 0);
 
   /**
    *
    * @param data What to fill the tensor with
    */
-  void setDeviceData(float *dev_data){
-    device_data = thrust::device_vector<float>(dev_data, dev_data + N*C); //init device_data;
-    raw_device_data = thrust::raw_pointer_cast(&device_data[0]); //init the raw pointer to hand off to cublas/cudnn routines
-  }
+  void setDeviceData(float *dev_data);
 
   /**
    *
    * @param data What to fill the tensor with
    */
-  void setData(float *data){
-    cpu_data = Eigen::Map<Eigen::MatrixXf>(data, N, C);
-    device_data = thrust::device_vector<float>(data, data + N*C); //init device_data;
-    raw_device_data = thrust::raw_pointer_cast(&device_data[0]); //init the raw pointer to hand off to cublas/cudnn routines
-  }
+  void setData(float *data);
 
-  void copy_back(){
-    checkCudaErrors(cudaMemcpyAsync(cpu_data.data(), raw_device_data, N*C*sizeof(float), cudaMemcpyDeviceToHost));
-  }
+  void copy_back();
 
 
 
 };
+
+
 
 
 #endif //NEURALNETWORKS_TENSOR_HPP
